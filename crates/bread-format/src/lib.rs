@@ -11,8 +11,10 @@
 //! four-byte tag, its own version, and a payload compressed with zstd and
 //! guarded by a CRC-32. [`container`] reads and writes chunks without knowing
 //! what they hold; [`scene`] and [`mesh`] are the codecs of the scene chunk
-//! and of the mesh chunks it places.
+//! and of the mesh chunks it places, and [`app`] carries the documents of
+//! the application chunks, such as editable supports.
 
+pub mod app;
 mod bytes;
 pub mod container;
 pub mod mesh;
@@ -20,12 +22,19 @@ mod meta;
 pub mod scene;
 
 #[cfg(test)]
+mod tests_app;
+#[cfg(test)]
 mod tests_container;
 #[cfg(test)]
 mod tests_mesh;
 #[cfg(test)]
 mod tests_scene;
 
+pub use app::{
+    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, LeafDocument,
+    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, decode_documents,
+    encode_documents,
+};
 pub use container::{BreadReader, BreadWriter, Chunk, ChunkTag, ReadBreadError};
 pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
