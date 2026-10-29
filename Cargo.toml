@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/bread-format"]
+
+[workspace.package]
+edition    = "2024"
+license    = "Apache-2.0"
+repository = "https://github.com/breadslicer-app/bread-format"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+# Block non-ASCII and visually confusable identifiers (homoglyph and
+# trojan-source identifier attacks). The bidi text-flow control lints
+# (text_direction_codepoint_in_literal / _in_comment) are already
+# deny-by-default in rustc.
+non_ascii_idents         = "deny"
+confusable_idents        = "deny"
+mixed_script_confusables = "deny"
+uncommon_codepoints      = "deny"
+
+missing_debug_implementations = "deny"
+unreachable_pub               = "deny"
+unused_qualifications         = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
