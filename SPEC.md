@@ -294,6 +294,9 @@ node's world transform is its parent's world transform composed with its own:
 - A **reference** shows one more copy of its subtree: the walk goes on into the subtree's root as
   if it were the reference's only child. A subtree that no reference names is not shown.
 
+A mesh that no leaf shows, such as a mesh resource that no leaf names, is kept in the file but not
+shown.
+
 Transforms are `f64` and vertices `f32`. A reader SHOULD compute world positions in `f64`, and
 round to `f32`, if it needs to, only at the end.
 
