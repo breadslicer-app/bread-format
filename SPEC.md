@@ -275,8 +275,8 @@ without any further check.
 Each node has at most one place in the scene: one group's child, a root, or a subtree's root. A
 reader MUST refuse the payload as malformed when:
 
-- a record or a root names a node, subtree, mesh or mesh resource that does not exist at that point
-  of the list;
+- a mesh resource, a record or a root names a mesh, mesh resource, node or subtree that does not
+  exist at that point of the payload;
 - a node is given a second place: listed as a child twice, in the same group or in two, or as a
   child and a root, a root twice, or a subtree's root and anything else.
 
