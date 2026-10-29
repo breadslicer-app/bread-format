@@ -118,7 +118,7 @@ pub fn encode_mesh(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
     if !fits_u32(vertex_count) || !fits_u32(mesh.triangles.len()) {
         return Err(EncodeMeshError::TooLarge);
     }
-    let indices: Vec<u32> = mesh.triangles.iter().flatten().copied().collect();
+    let indices = mesh.triangles.as_flattened();
     if indices.iter().any(|&index| index as usize >= vertex_count) {
         return Err(EncodeMeshError::VertexOutOfRange);
     }
@@ -126,7 +126,7 @@ pub fn encode_mesh(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
         meshopt::encode_vertex_buffer_level(&mesh.vertices, VERTEX_LEVEL, Some(VERTEX_VERSION))
             .expect("12-byte vertices encode");
     let encoded_indices =
-        meshopt::encode_index_buffer(&indices, vertex_count).expect("whole triangles encode");
+        meshopt::encode_index_buffer(indices, vertex_count).expect("whole triangles encode");
     // The triangle codec's version can only be set through a global, unsafe
     // switch, so its default is checked instead.
     assert_eq!(
@@ -155,8 +155,10 @@ pub fn encode_mesh(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
     out.bytes(&encoded_indices);
 
     let rotations: Vec<(usize, u8)> = stored
-        .chunks_exact(3)
-        .zip(indices.chunks_exact(3))
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(&mesh.triangles)
         .enumerate()
         .filter(|(_, (stored, original))| stored != original)
         .map(|(triangle, (stored, original))| {
@@ -214,6 +216,7 @@ fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
     let mut indices: Vec<u32> =
         meshopt::decode_index_buffer(encoded_indices, triangle_count.checked_mul(3)?).ok()?;
 
+    let faces = indices.as_chunks_mut::<3>().0;
     let rotations = input.count(5)?;
     let mut triangle = 0usize;
     for listed in 0..rotations {
@@ -226,9 +229,7 @@ fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
         if !(1..3).contains(&corner) {
             return None;
         }
-        let start = triangle.checked_mul(3)?;
-        let face = indices.get_mut(start..start.checked_add(3)?)?;
-        face.rotate_left(corner);
+        faces.get_mut(triangle)?.rotate_left(corner);
     }
     if !input.is_empty() {
         return None;
@@ -239,9 +240,6 @@ fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
     Some(Ok(Mesh {
         meta,
         vertices,
-        triangles: indices
-            .chunks_exact(3)
-            .map(|face| [face[0], face[1], face[2]])
-            .collect(),
+        triangles: indices.as_chunks::<3>().0.to_vec(),
     }))
 }
