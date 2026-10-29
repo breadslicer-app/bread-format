@@ -10,21 +10,28 @@
 //! A `.bread` file is a short header followed by chunks. Each chunk has a
 //! four-byte tag, its own version, and a payload compressed with zstd and
 //! guarded by a CRC-32. [`container`] reads and writes chunks without knowing
-//! what they hold; [`mesh`] is the codec of the mesh chunk.
+//! what they hold; [`scene`] and [`mesh`] are the codecs of the scene chunk
+//! and of the mesh chunks it places.
 
-#[expect(dead_code, reason = "the scene codec that uses the rest arrives next")]
 mod bytes;
 pub mod container;
 pub mod mesh;
 mod meta;
+pub mod scene;
 
 #[cfg(test)]
 mod tests_container;
 #[cfg(test)]
 mod tests_mesh;
+#[cfg(test)]
+mod tests_scene;
 
 pub use container::{BreadReader, BreadWriter, Chunk, ChunkTag, ReadBreadError};
 pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };
 pub use meta::Meta;
+pub use scene::{
+    DecodeSceneError, EncodeSceneError, Node, NodeKind, SCENE_TAG, SCENE_VERSION, Scene, Transform,
+    decode_scene, encode_scene,
+};
