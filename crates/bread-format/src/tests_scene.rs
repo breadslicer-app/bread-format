@@ -87,7 +87,7 @@ pub(crate) fn scene() -> Scene {
     }
 }
 
-fn u32s(values: &[u32]) -> Vec<u8> {
+pub(crate) fn u32s(values: &[u32]) -> Vec<u8> {
     values
         .iter()
         .flat_map(|value| value.to_le_bytes())
