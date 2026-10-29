@@ -209,7 +209,103 @@ maximum beyond the `u64` lengths.
 
 ## 6. Mesh (`MESH`)
 
-*Not written yet (#3).*
+A `MESH` chunk holds one triangle mesh: its vertex positions, and triangles that name them. The
+scene names meshes by the order of their `MESH` chunks. This section describes chunk version 1.
+
+### 6.1 What is kept
+
+A mesh read back is the mesh that was written:
+
+- the same vertices, in the same order, every coordinate bit for bit;
+- the same triangles, in the same order, each starting at the same corner, so winding and first
+  corner are both kept;
+- its name and comment, when it has them.
+
+A writer MUST store vertices and triangles in the mesh's own order, and MUST NOT reorder them to
+compress better.
+
+Facet normals that a source file declares, such as the one STL stores with every triangle, are not
+kept: they are file data, not geometry. A program that needs them computes them from the triangle's
+corners.
+
+### 6.2 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| has metadata | `u8` | `0`: no name or comment follow. `1`: they do. |
+| name | optional string | the mesh's name; present only when *has metadata* is `1` |
+| comment | optional string | free text that came with the mesh, such as an STL header; present only when *has metadata* is `1` |
+| vertex count | `u32` | how many vertices the mesh has |
+| vertex buffer | byte string | the vertices, encoded ([6.3](#63-vertices)) |
+| triangle count | `u32` | how many triangles the mesh has |
+| index buffer | byte string | the triangles, encoded ([6.4](#64-triangles)) |
+| rotations | count, then 5 bytes each | the triangles to turn back ([6.5](#65-rotations)) |
+
+A *has metadata* flag other than `0` or `1` makes the payload malformed. A mesh with metadata whose
+name and comment are both absent is a different value from a mesh with no metadata.
+
+### 6.3 Vertices
+
+A vertex is three `f32`, x then y then z: 12 bytes, little-endian like every value in this
+document. The vertex buffer holds all of them, in order,
+encoded with **version 1 of the attribute codec**: the bitstream "Mode 0: attributes" in Appendix A
+of the glTF extension `KHR_meshopt_compression`, as published at
+[commit `3e9dfff`](https://github.com/KhronosGroup/glTF/blob/3e9dfff91d52cd79fa0169e8453b7fdaca663fd8/extensions/2.0/Khronos/KHR_meshopt_compression/README.md#mode-0-attributes)
+of the Khronos glTF repository, with:
+
+- a byte stride of 12, and as many elements as the vertex count;
+- no filter: the decoded bytes are the vertices themselves.
+
+The codec works on bytes and keeps every one of them, so it keeps every bit of every coordinate.
+
+- The buffer's first byte MUST be `0xA1`. A reader MUST refuse any other first byte as malformed,
+  including `0xA0`: version 0 of the codec is published too, but this chunk version does not use
+  it. A writer MUST write version 1, whatever its encoder's default.
+- Every block of up to 256 vertices starts with a 3-byte control header, so a buffer of *L* bytes
+  holds fewer than 256 × *L* / 3 vertices. A larger vertex count is malformed, and a reader MUST
+  refuse it before allocating for it ([Malformed payloads](#33-malformed-payloads)).
+- A buffer that ends before every vertex is decoded, or that has bytes left over before its tail
+  block, is malformed.
+
+### 6.4 Triangles
+
+A triangle is three `u32` indices into the vertices, starting at 0. The index buffer holds the
+indices of all triangles, in order, encoded with **version 1 of the triangle codec**: the bitstream
+"Mode 1: triangles" in Appendix A of the glTF extension `EXT_meshopt_compression`, as published at
+[commit `5ccac1c`](https://github.com/KhronosGroup/glTF/blob/5ccac1cb0f85197c4f78c3ddff0b12cdccd79da3/extensions/2.0/Vendor/EXT_meshopt_compression/README.md#mode-1-triangles)
+of the Khronos glTF repository (`KHR_meshopt_compression` defines the same bitstream), with:
+
+- a byte stride of 4, and three times the triangle count as the element count.
+
+Then:
+
+- The buffer's first byte MUST be `0xE1`. A reader MUST refuse any other first byte as malformed.
+- Every triangle takes at least one byte, besides the first byte and a 16-byte tail block, so a
+  buffer of *L* bytes holds at most *L* − 17 triangles. A larger triangle count is malformed, and a
+  reader MUST refuse it before allocating for it.
+- A buffer that does not decode to exactly the triangle count is malformed.
+- Every index MUST be less than the vertex count. A reader MUST refuse a triangle that names a
+  vertex the mesh does not have.
+
+### 6.5 Rotations
+
+The triangle codec may store a triangle starting at another of its corners: a triangle (a, b, c)
+can come back from the index buffer as (b, c, a) or (c, a, b), with the same winding. The rotation
+list names those triangles and turns each one back.
+
+| Field | Type | Meaning |
+|---|---|---|
+| gap | `u32` | for the first rotation, the triangle's index; for each later one, how far past the previous rotation's triangle it is |
+| corner | `u8` | `1` or `2`: which corner of the decoded triangle is the first one |
+
+A decoded triangle (s₀, s₁, s₂) with corner *c* becomes (s*c*, s*c*+1, s*c*+2), indices taken
+modulo 3. So corner 1 turns (c, a, b) back into (a, b, c), and corner 2 does the same for
+(b, c, a).
+
+- A writer lists every triangle that came back rotated, and only those, in increasing order. So
+  every gap after the first is at least 1.
+- A reader MUST refuse as malformed a rotation that names a triangle past the last one, a corner
+  other than `1` or `2`, or a gap of 0 after the first rotation.
 
 ## 7. Chunk registry
 
