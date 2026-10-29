@@ -98,7 +98,110 @@ supports. Skipping such a chunk could lose data the rest of the file depends on.
 
 ## 4. Container
 
-*Not written yet (#2).*
+A file is a header followed by chunks, one after another, until the end of the file. There is no
+index, no end marker and no padding between chunks.
+
+```text
+header   magic, container version
+chunk    tag, chunk version, raw length, stored length, CRC-32, stored bytes
+chunk    ...
+```
+
+### 4.1 Header
+
+| Offset | Field | Type | Value |
+|---|---|---|---|
+| 0 | magic | 8 bytes | `42 52 45 41 44 00 0D 0A`: `BREAD`, NUL, CR, LF |
+| 8 | container version | `u16` | `1` |
+
+The magic is built the way PNG's is:
+
+- `BREAD` names the format to anyone looking at the bytes;
+- the NUL byte makes tools that guess whether a file is text treat it as binary;
+- CR LF catches a file that went through a text-mode transfer: turning line endings from CR LF
+  into LF, or from LF into CR LF, changes the magic. A transfer that leaves the magic alone but
+  changes bytes further on is caught by the chunk checksums.
+
+This document describes container version 1, so every file starts with these ten bytes:
+`42 52 45 41 44 00 0D 0A 01 00`.
+
+### 4.2 Chunks
+
+| Offset | Field | Type | Meaning |
+|---|---|---|---|
+| 0 | tag | 4 bytes | what the chunk holds |
+| 4 | chunk version | `u16` | the layout of this chunk's payload |
+| 6 | raw length | `u64` | the length of the payload, in bytes |
+| 14 | stored length | `u64` | the length of the stored bytes |
+| 22 | CRC | `u32` | the CRC-32 of the stored bytes |
+| 26 | stored bytes | stored length | the payload, compressed |
+
+Offsets count from the start of the chunk, and the next chunk starts right after the stored bytes.
+
+- **Tag:** four bytes, compared byte for byte. The official tags are four ASCII letters, listed in
+  the [chunk registry](#7-chunk-registry), which also says how other programs name chunks of their
+  own.
+- **Chunk version:** see [Versions](#34-versions).
+- The container does not limit how many chunks of a tag a file holds, or their order. Each chunk's
+  section does.
+
+### 4.3 Stored bytes and checksum
+
+The stored bytes are one Zstandard frame ([RFC 8878](https://www.rfc-editor.org/rfc/rfc8878)) that
+decompresses to the payload.
+
+- A writer MUST NOT write a frame that needs a dictionary.
+- A writer SHOULD NOT write a frame whose window is larger than 8 MB. RFC 8878 recommends that
+  limit so that every decoder can read the frame.
+- The compression level is the writer's choice. A reader does not need to know it, and two writers
+  may store the same payload as different bytes.
+
+The CRC is the CRC-32 used by zlib, gzip and PNG: polynomial `0x04C11DB7`, input and output
+reflected, initial value `0xFFFFFFFF`, final XOR `0xFFFFFFFF`. As a check, the CRC-32 of the nine
+ASCII bytes `123456789` is `0xCBF43926`. It covers the stored bytes only, not the chunk header, and
+unlike PNG's it is stored little-endian, like every other field.
+
+### 4.4 Reading a file
+
+A reader checks the header, then reads chunks until the file ends right after a chunk's stored
+bytes. For each chunk it reads the 26-byte chunk header and the stored bytes, checks the CRC, and
+then skips the chunk, refuses the file, or decompresses the payload, as the table says.
+
+| What the reader finds | What it MUST do |
+|---|---|
+| fewer than 8 bytes, or 8 bytes that are not the magic | refuse the input: it is not a `.bread` file |
+| a container version newer than the ones it supports | refuse the file |
+| the file ends inside the container version, a chunk header or the stored bytes | refuse the file: it is cut short |
+| a CRC that does not match the stored bytes, in any chunk | refuse the file: it is damaged |
+| a tag it does not know | skip the chunk and go on |
+| a tag it knows, at a chunk version newer than the ones it supports | refuse the file |
+| stored bytes of a chunk it reads that are not a valid frame, or that do not decompress to exactly the raw length | refuse the file: it is damaged |
+
+A reader need not decompress a chunk it skips. If it does, and the stored bytes fail as in the last
+row, it MAY refuse the file, since no writer writes such a chunk.
+
+When a reader refuses a file it SHOULD say why, naming the chunk's tag when one chunk is at fault.
+
+### 4.5 Size limits
+
+Lengths come from the file, so a damaged one can be enormous: one flipped bit in a raw length can
+ask for 2⁶³ bytes. A reader MUST NOT allocate memory for a recorded length before it holds the bytes
+that back it:
+
+- **Stored bytes:** read them as they arrive, stopping at the end of the file, or first check that
+  the stored length fits in what is left of the file.
+- **Payload:** decompress as a stream and stop as soon as the output goes past the raw length,
+  instead of allocating the raw length up front. A content size recorded in the Zstandard frame is
+  just as untrusted.
+
+Memory then grows with what the file really holds once decompressed, never with what a damaged
+length claims. The same rule applies to the counts inside payloads ([Malformed
+payloads](#33-malformed-payloads)).
+
+A reader MAY also set maximums of its own, such as the largest payload or the largest total it
+decompresses, or the largest Zstandard window, and refuse a file that goes past them. Such a refusal
+SHOULD say that the file is too large for the reader, not that it is damaged. This document sets no
+maximum beyond the `u64` lengths.
 
 ## 5. Scene (`SCNE`)
 
