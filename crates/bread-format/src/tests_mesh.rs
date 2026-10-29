@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-use crate::mesh::{DecodeMeshError, EncodeMeshError, Mesh, MeshMeta, decode_mesh, encode_mesh};
+use crate::mesh::{DecodeMeshError, EncodeMeshError, Mesh, decode_mesh, encode_mesh};
+use crate::meta::Meta;
 
 /// A bumpy grid with its triangles shuffled and started at varied corners,
 /// so the codec has triangles to rotate, and with awkward coordinates.
@@ -35,7 +36,7 @@ pub(crate) fn grid(side: u32) -> Mesh {
         })
         .collect();
     Mesh {
-        meta: Some(MeshMeta {
+        meta: Some(Meta {
             name: Some("grid ñ".into()),
             comment: None,
         }),
@@ -107,12 +108,12 @@ fn a_mesh_comes_back_identical_with_its_first_corners() {
 #[test]
 fn metadata_and_its_absence_come_back() {
     let mut mesh = grid(2);
-    mesh.meta = Some(MeshMeta {
+    mesh.meta = Some(Meta {
         name: None,
         comment: Some("solid exported".into()),
     });
     assert_identical(&round_trip(&mesh), &mesh);
-    mesh.meta = Some(MeshMeta::default());
+    mesh.meta = Some(Meta::default());
     assert_identical(&round_trip(&mesh), &mesh);
     mesh.meta = None;
     assert_identical(&round_trip(&mesh), &mesh);
