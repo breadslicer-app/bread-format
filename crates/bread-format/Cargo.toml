@@ -1,0 +1,15 @@
+[package]
+name = "bread-format"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors = ["SynrgStudio"]
+description = "Reads and writes .bread files: tiny, lossless meshes and scenes, with room for slicer data such as editable supports."
+categories = ["encoding"]
+keywords = ["3d", "mesh", "lossless", "file-format", "slicer"]
+repository.workspace = true
+# Not published until the crates.io name is settled.
+publish = false
+
+[lints]
+workspace = true
