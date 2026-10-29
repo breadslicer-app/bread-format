@@ -213,4 +213,46 @@ maximum beyond the `u64` lengths.
 
 ## 7. Chunk registry
 
-*Not written yet (#7, #8).*
+Every tag a writer writes MUST be four ASCII letters or digits, the first of them a letter. The case
+of that first letter says who the tag belongs to:
+
+- **Uppercase (`A`–`Z`): official.** The tag is listed below, and this document describes it. A
+  writer MUST NOT write an uppercase tag that is not listed.
+- **Lowercase (`a`–`z`): private.** A program names chunks of its own this way, and no official
+  chunk will ever use such a tag ([7.2](#72-private-chunks)).
+
+A reader skips every tag it does not know, whatever its bytes ([Reading a
+file](#44-reading-a-file)).
+
+### 7.1 Official chunks
+
+| Tag | Version | Per file | Holds | Section |
+|---|---|---|---|---|
+| `SCNE` | 1 | exactly one | the scene: its nodes, their transforms, and the meshes they use | [5](#5-scene-scne) |
+| `MESH` | 1 | any number | one triangle mesh | [6](#6-mesh-mesh) |
+| `PROJ` | 1 | at most one | application data: project settings | [7.3](#73-application-chunks) |
+| `SUPP` | 1 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
+| `HOLW` | 1 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
+
+*Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
+that holds a different number of chunks of that tag than *Per file* allows.
+
+A new official chunk, or a new version of one, is added to this table by a change to this document.
+
+### 7.2 Private chunks
+
+A program can store data of its own in a private chunk, without an official tag:
+
+- A private chunk MUST NOT change what the official chunks mean. A reader that skips it MUST still
+  read the rest of the file right: the same meshes, placed by the same scene.
+- Two programs may choose the same private tag. A program that reads its own private chunks SHOULD
+  make sure that a payload is its own, for example by starting it with the program's name, and skip
+  the chunk when it is not.
+- The chunk version of a private chunk belongs to the program that writes it.
+
+A program that edits a file and writes it back MAY drop the chunks it does not know, official or
+private. Nothing guarantees that a chunk survives another program's edits.
+
+### 7.3 Application chunks
+
+*Not written yet (#8).*
