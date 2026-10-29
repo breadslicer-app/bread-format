@@ -205,7 +205,100 @@ maximum beyond the `u64` lengths.
 
 ## 5. Scene (`SCNE`)
 
-*Not written yet (#5).*
+The scene chunk places the meshes: a tree of groups and leaves, each node with a transform, where a
+leaf shows one mesh. A mesh several leaves show is stored once, and a whole subtree can be shared
+too: each reference node places one more copy of it. Every reader can draw all of it. The result of
+an operation on several meshes, such as a boolean difference, is stored as a leaf that shows the
+resulting mesh.
+
+A file holds exactly one scene chunk. This section describes chunk version 1.
+
+### 5.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| has metadata | `u8` | `0`: no name or comment follow. `1`: they do. |
+| name | optional string | the scene's name; present only when *has metadata* is `1` |
+| comment | optional string | free text about the scene; present only when *has metadata* is `1` |
+| mesh count | `u32` | how many `MESH` chunks the file holds |
+| mesh resources | count, then a `u32` mesh index each | the meshes the scene keeps as shared ([5.2](#52-records)) |
+| records | count, then the records | the nodes and the subtrees, children first ([5.2](#52-records)) |
+| roots | count, then a `u32` node index each | the scene's top-level nodes, in order |
+
+The scene names everything by index, each kind of thing numbered from 0 in its own order:
+
+- **meshes:** the `MESH` chunks, in file order. The mesh count MUST equal the number of `MESH`
+  chunks in the file, and a reader MUST refuse the file when it does not;
+- **mesh resources:** the entries of the mesh resources list, in order;
+- **nodes:** the node records, in order. Subtree records do not count;
+- **subtrees:** the subtree records, in order.
+
+### 5.2 Records
+
+Each record starts with a `u8` kind:
+
+| Kind | Record | Fields after the kind |
+|---|---|---|
+| `0` | group | node fields; then a count, and a `u32` node index for each child, in order |
+| `1` | leaf | node fields; then a `u32` mesh index |
+| `2` | leaf with a shared mesh | node fields; then a `u32` mesh resource index |
+| `4` | reference | node fields; then a `u32` subtree index |
+| `5` | subtree | a `u32` node index: that node becomes the root of the next subtree |
+
+Any other kind, `3` included, makes the payload malformed.
+
+Records of kinds 0, 1, 2 and 4 are nodes, and start with the same node fields:
+
+| Field | Type | Meaning |
+|---|---|---|
+| has metadata | `u8` | `0`: no name or comment follow. `1`: they do. |
+| name | optional string | the node's name; present only when *has metadata* is `1` |
+| comment | optional string | free text about the node; present only when *has metadata* is `1` |
+| has transform | `u8` | `0`: the identity, and nothing follows. `1`: twelve `f64` follow. |
+| linear part | 9 `f64` | the 3 × 3 matrix *M*, row by row; present only when *has transform* is `1` |
+| translation | 3 `f64` | the vector *t*; present only when *has transform* is `1` |
+
+A node's transform takes a point *p* in the node's own space to its parent's space:
+*p*′ = *M* *p* + *t*. That is, x′ = m₀₀ x + m₀₁ y + m₀₂ z + tₓ, and likewise for y′ and z′ with the
+second and third rows.
+
+Both kinds of leaf show one mesh. A kind 2 leaf names it through the mesh resources list: a mesh the
+scene keeps as shared on purpose, so that a program editing it changes every leaf that shows it. A
+mesh that several kind 1 leaves show is also stored only once.
+
+### 5.3 What a reader checks
+
+Records are listed children first: every record names only nodes, mesh resources and subtrees
+listed before it. So no node can contain itself, and no subtree can reach itself through references,
+without any further check.
+
+Each node has at most one place in the scene: one group's child, a root, or a subtree's root. A
+reader MUST refuse the payload as malformed when:
+
+- a record or a root names a node, subtree, mesh or mesh resource that does not exist at that point
+  of the list;
+- a node is given a second place: listed as a child twice, in the same group or in two, or as a
+  child and a root, a root twice, or a subtree's root and anything else.
+
+A node that has no place is not part of the scene: a writer SHOULD NOT list one, and a reader
+ignores it.
+
+### 5.4 Placing the meshes
+
+To place the meshes, walk down from each root, in order, starting with the identity transform. Each
+node's world transform is its parent's world transform composed with its own:
+*W*(node) = *W*(parent) ∘ *T*(node), where (*A* ∘ *B*)(*p*) = *A*(*B*(*p*)).
+
+- A **group** passes its world transform on to each of its children.
+- A **leaf** shows its mesh with its world transform: each vertex *v* goes to *W*(leaf)(*v*).
+- A **reference** shows one more copy of its subtree: the walk goes on into the subtree's root as
+  if it were the reference's only child. A subtree that no reference names is not shown.
+
+A mesh that no leaf shows, such as a mesh resource that no leaf names, is kept in the file but not
+shown.
+
+Transforms are `f64` and vertices `f32`. A reader SHOULD compute world positions in `f64`, and
+round to `f32`, if it needs to, only at the end.
 
 ## 6. Mesh (`MESH`)
 
