@@ -351,4 +351,60 @@ private. Nothing guarantees that a chunk survives another program's edits.
 
 ### 7.3 Application chunks
 
-*Not written yet (#8).*
+Application chunks carry documents that belong to one program, such as a slicer's editable
+supports. Their tags are official, so they never clash, but this document describes only their
+envelope: which part of the scene a document belongs to, and who wrote it. What a document holds is
+up to the program that wrote it.
+
+A reader that does not use them MAY skip them, and the file still reads right: the scene and the
+meshes say everything such a reader shows. Below, each chunk says what that is. The three
+application chunks so far come from Breadslicer, the slicer the format started in.
+
+#### `PROJ`: project settings
+
+The payload is Breadslicer's project settings document, with no envelope: a UTF-8 TOML document
+that starts with its own version, holding the printer, the resin and the export format. Another
+program SHOULD keep settings of its own in a private chunk ([7.2](#72-private-chunks)), not in
+`PROJ`.
+
+A reader that skips `PROJ` sees the same scene, without the settings it was prepared with.
+
+#### `SUPP` and `HOLW`: the envelope
+
+Both chunks are a list of entries, one per leaf of the scene:
+
+| Field | Type | Meaning |
+|---|---|---|
+| entries | count | how many entries follow |
+| leaf | `u32` | the leaf's node index in the scene chunk ([5](#5-scene-scne)) |
+| generator | byte string | the name of what wrote the document, as UTF-8 text, such as `df` |
+| document version | `u32` | the generator's own version of the document |
+| document | byte string | the document |
+
+The last four fields repeat for every entry, so each entry takes at least 16 bytes. A reader that
+reads one of these chunks:
+
+- MUST refuse it as malformed if a generator name is not valid UTF-8;
+- MUST refuse the file if an entry's leaf index names no node of the scene, or a node that is not a
+  leaf;
+- SHOULD treat an entry whose generator it does not know, or whose document version is newer than
+  the ones it supports, as if the entry were absent.
+
+#### `SUPP`: supports
+
+Each entry is a leaf that shows supports, and its document describes them: tips, trunks, joints,
+rafts and the settings they were built with. The leaf is stored with an empty mesh, one with no
+vertices and no triangles, and the program that wrote the document rebuilds the mesh from it, so the
+supports stay editable.
+
+A reader that skips `SUPP` sees the support leaves with no mesh: it shows the models without their
+supports. This document does not yet give such readers a preview of the supports.
+
+#### `HOLW`: hollowed models
+
+Each entry is a leaf whose model was hollowed, and its document describes how: the mesh the model
+was hollowed from, the hollowing settings and the drain holes. Unlike a support leaf, the leaf keeps
+its mesh, the hollow, so the program that wrote the document can hollow the original again with new
+settings or drains.
+
+A reader that skips `HOLW` sees the hollowed models, as they will print.
