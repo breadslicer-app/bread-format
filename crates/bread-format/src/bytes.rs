@@ -5,6 +5,11 @@
 
 //! Little-endian writing and bounds-checked reading of chunk payloads.
 
+/// Whether `n` items fit a count, which is a `u32`.
+pub(crate) fn fits_u32(n: usize) -> bool {
+    u32::try_from(n).is_ok()
+}
+
 /// Appends values to a payload.
 #[derive(Debug, Default)]
 pub(crate) struct Out(pub(crate) Vec<u8>);

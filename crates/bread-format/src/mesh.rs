@@ -25,8 +25,9 @@
 
 use std::fmt;
 
-use crate::bytes::{In, Out};
+use crate::bytes::{In, Out, fits_u32};
 use crate::container::ChunkTag;
+use crate::meta::{Meta, read_meta, write_meta};
 
 /// The tag of a mesh chunk.
 pub const MESH_TAG: ChunkTag = ChunkTag(*b"MESH");
@@ -55,20 +56,13 @@ const INDEX_BUFFER_OVERHEAD: usize = 17;
 /// A triangle mesh, as a mesh chunk keeps it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Mesh {
-    /// The name and comment, or `None` for a mesh without metadata (which is
-    /// not the same as metadata whose name and comment are both absent).
-    pub meta: Option<MeshMeta>,
+    /// The name and comment, such as an STL header, or `None` for a mesh
+    /// without metadata.
+    pub meta: Option<Meta>,
     /// The vertex positions: x, y and z.
     pub vertices: Vec<[f32; 3]>,
     /// The triangles: three indices into `vertices` each, first corner first.
     pub triangles: Vec<[u32; 3]>,
-}
-
-/// A mesh's name, and free text that came with it, such as an STL header.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct MeshMeta {
-    pub name: Option<String>,
-    pub comment: Option<String>,
 }
 
 /// Why a mesh could not be encoded.
@@ -141,14 +135,7 @@ pub fn encode_mesh(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
         .expect("the codec reads its own output");
 
     let mut out = Out::default();
-    match &mesh.meta {
-        None => out.u8(0),
-        Some(meta) => {
-            out.u8(1);
-            out.text(meta.name.as_deref());
-            out.text(meta.comment.as_deref());
-        }
-    }
+    write_meta(&mut out, mesh.meta.as_ref());
     out.len(vertex_count);
     out.bytes(&encoded_vertices);
     out.len(mesh.triangles.len());
@@ -178,24 +165,13 @@ pub fn encode_mesh(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
     Ok(out.0)
 }
 
-fn fits_u32(n: usize) -> bool {
-    u32::try_from(n).is_ok()
-}
-
 /// Decodes a mesh chunk payload.
 pub fn decode_mesh(payload: &[u8]) -> Result<Mesh, DecodeMeshError> {
     decode(&mut In(payload)).ok_or(DecodeMeshError::Malformed)?
 }
 
 fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
-    let meta = match input.u8()? {
-        0 => None,
-        1 => Some(MeshMeta {
-            name: input.text()?,
-            comment: input.text()?,
-        }),
-        _ => return None,
-    };
+    let meta = read_meta(input)?;
     let vertex_count = input.len()?;
     let encoded_vertices = input.bytes()?;
     if encoded_vertices.first() != Some(&VERTEX_HEADER)

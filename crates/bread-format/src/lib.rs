@@ -16,6 +16,7 @@
 mod bytes;
 pub mod container;
 pub mod mesh;
+mod meta;
 
 #[cfg(test)]
 mod tests_container;
@@ -24,6 +25,6 @@ mod tests_mesh;
 
 pub use container::{BreadReader, BreadWriter, Chunk, ChunkTag, ReadBreadError};
 pub use mesh::{
-    DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, MeshMeta, decode_mesh,
-    encode_mesh,
+    DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };
+pub use meta::Meta;
