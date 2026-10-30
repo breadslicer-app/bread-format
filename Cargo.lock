@@ -34,6 +34,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bread-wasm"
+version = "0.1.0"
+dependencies = [
+ "bread-format",
+]
+
+[[package]]
 name = "cc"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

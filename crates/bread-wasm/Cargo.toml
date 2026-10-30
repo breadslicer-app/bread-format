@@ -1,0 +1,31 @@
+[package]
+name = "bread-wasm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors = ["SynrgStudio"]
+description = "The bread-format crate behind a small C ABI, built to WebAssembly for JavaScript."
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bread-format = { path = "../bread-format" }
+
+# The workspace lints, except that unsafe code is denied instead of forbidden:
+# the C ABI in `abi.rs` takes raw pointers from JavaScript, and is the only
+# module allowed to.
+[lints.rust]
+unsafe_code                   = "deny"
+non_ascii_idents              = "deny"
+confusable_idents             = "deny"
+mixed_script_confusables      = "deny"
+uncommon_codepoints           = "deny"
+missing_debug_implementations = "deny"
+unreachable_pub               = "deny"
+unused_qualifications         = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
