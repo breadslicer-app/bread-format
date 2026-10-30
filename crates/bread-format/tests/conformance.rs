@@ -20,7 +20,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use bread_format::{
-    BreadFile, Mesh, Meta, Node, NodeKind, Scene, Transform, read_file, write_file,
+    BreadFile, BreadReader, BreadWriter, ChunkTag, HollowEntry, MESH_TAG, Mesh, Meta, Node,
+    NodeKind, Scene, SupportEntry, Transform, read_file, write_file,
 };
 use sha2::{Digest, Sha256};
 
@@ -29,19 +30,69 @@ struct Case {
     name: &'static str,
     description: &'static str,
     file: fn() -> BreadFile,
+    /// Chunks a reader skips, written right after the scene chunk.
+    skipped: &'static [Extra],
 }
+
+/// A chunk the crate does not write: its tag, version and payload.
+type Extra = (ChunkTag, u16, &'static [u8]);
 
 const CASES: &[Case] = &[
     Case {
         name: "triangle",
         description: "One triangle, shown by one leaf, with no names and no transform.",
         file: triangle,
+        skipped: &[],
     },
     Case {
         name: "cube",
         description: "A unit cube of 8 vertices and 12 triangles, with a named scene, node and \
                       mesh.",
         file: cube,
+        skipped: &[],
+    },
+    Case {
+        name: "two-parts",
+        description: "A named group of two named leaves, each showing its own mesh, one of them \
+                      moved. One name holds text beyond ASCII, and the group has a comment.",
+        file: two_parts,
+        skipped: &[],
+    },
+    Case {
+        name: "shared-mesh",
+        description: "One mesh, kept as a mesh resource and shown by two leaves with different \
+                      transforms: one moved, one turned, scaled and moved.",
+        file: shared_mesh,
+        skipped: &[],
+    },
+    Case {
+        name: "rotated-triangle",
+        description: "One triangle listed from its second corner, which the triangle codec \
+                      stores from another corner: a reader gives back the listed one.",
+        file: rotated_triangle,
+        skipped: &[],
+    },
+    Case {
+        name: "unknown-chunk",
+        description: "The triangle file with a chunk of an official-looking tag that no reader \
+                      knows, at version 9, after the scene chunk: a reader skips it.",
+        file: triangle,
+        skipped: &[(ChunkTag(*b"ZZZZ"), 9, b"a chunk no reader knows")],
+    },
+    Case {
+        name: "private-chunk",
+        description: "The triangle file with a private chunk after the scene chunk: a reader \
+                      that does not know it skips it.",
+        file: triangle,
+        skipped: &[(ChunkTag(*b"xmpl"), 1, b"example: private data")],
+    },
+    Case {
+        name: "slicer-data",
+        description: "A hollowed model with supports: project settings, a supports entry whose \
+                      support leaf shows an empty mesh, and a hollows entry whose original mesh \
+                      no leaf shows.",
+        file: slicer_data,
+        skipped: &[],
     },
 ];
 
@@ -60,16 +111,28 @@ fn leaf(meta: Option<Meta>, transform: Option<Transform>, mesh: usize) -> Node {
     }
 }
 
-fn triangle() -> BreadFile {
-    let mesh = Mesh {
+fn moved(translation: [f64; 3]) -> Option<Transform> {
+    Some(Transform {
+        linear: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        translation,
+    })
+}
+
+fn triangle_mesh(triangle: [u32; 3]) -> Mesh {
+    Mesh {
         meta: None,
         vertices: vec![[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]],
-        triangles: vec![[0, 1, 2]],
-    };
+        triangles: vec![triangle],
+    }
+}
+
+/// A scene of one leaf, at the root, showing `mesh`.
+fn one_leaf(scene: Option<Meta>, node: Option<Meta>, mesh: Mesh) -> BreadFile {
     BreadFile {
         scene: Scene {
+            meta: scene,
             meshes: vec![mesh],
-            nodes: vec![leaf(None, None, 0)],
+            nodes: vec![leaf(node, None, 0)],
             roots: vec![0],
             ..Scene::default()
         },
@@ -77,7 +140,105 @@ fn triangle() -> BreadFile {
     }
 }
 
+fn triangle() -> BreadFile {
+    one_leaf(None, None, triangle_mesh([0, 1, 2]))
+}
+
+fn rotated_triangle() -> BreadFile {
+    one_leaf(None, None, triangle_mesh([1, 2, 0]))
+}
+
 fn cube() -> BreadFile {
+    one_leaf(named("cube scene"), named("cube"), cube_mesh("cube mesh"))
+}
+
+fn two_parts() -> BreadFile {
+    let group = Node {
+        meta: Some(Meta {
+            name: Some("assembly".into()),
+            comment: Some("Two parts that print together.".into()),
+        }),
+        transform: None,
+        kind: NodeKind::Group {
+            children: vec![0, 1],
+        },
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![cube_mesh("base"), triangle_mesh([0, 1, 2])],
+            nodes: vec![
+                leaf(named("base"), None, 0),
+                leaf(named("lid \u{2014} top"), moved([0.0, 0.0, 1.5]), 1),
+                group,
+            ],
+            roots: vec![2],
+            ..Scene::default()
+        },
+        ..BreadFile::default()
+    }
+}
+
+fn shared_mesh() -> BreadFile {
+    let shared = |name, transform| Node {
+        meta: named(name),
+        transform,
+        kind: NodeKind::SharedLeaf { resource: 0 },
+    };
+    // A quarter turn about z at half size, then moved.
+    let turned = Transform {
+        linear: [[0.0, -0.5, 0.0], [0.5, 0.0, 0.0], [0.0, 0.0, 0.5]],
+        translation: [-3.25, 0.1, 1e-3],
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![cube_mesh("shared cube")],
+            mesh_resources: vec![0],
+            nodes: vec![
+                shared("left", moved([2.0, 0.0, 0.0])),
+                shared("right", Some(turned)),
+            ],
+            roots: vec![0, 1],
+            ..Scene::default()
+        },
+        ..BreadFile::default()
+    }
+}
+
+fn slicer_data() -> BreadFile {
+    let empty = Mesh {
+        meta: None,
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![triangle_mesh([0, 1, 2]), empty, cube_mesh("original")],
+            nodes: vec![
+                leaf(named("model"), None, 0),
+                leaf(named("supports"), None, 1),
+            ],
+            roots: vec![0, 1],
+            ..Scene::default()
+        },
+        settings: Some(b"version = 1\n".to_vec()),
+        supports: vec![SupportEntry {
+            model: 0,
+            support: 1,
+            generator: "example".into(),
+            version: 1,
+            document: b"supports document".to_vec(),
+        }],
+        hollows: vec![HollowEntry {
+            model: 0,
+            original: 2,
+            generator: "example".into(),
+            version: 1,
+            document: b"hollows document".to_vec(),
+        }],
+    }
+}
+
+fn cube_mesh(name: &str) -> Mesh {
     let vertices = (0..8)
         .map(|i| [i & 1, (i >> 1) & 1, (i >> 2) & 1].map(|c| c as f32))
         .collect();
@@ -96,20 +257,10 @@ fn cube() -> BreadFile {
         [1, 3, 7],
         [1, 7, 5],
     ];
-    let mesh = Mesh {
-        meta: named("cube mesh"),
+    Mesh {
+        meta: named(name),
         vertices,
         triangles,
-    };
-    BreadFile {
-        scene: Scene {
-            meta: named("cube scene"),
-            meshes: vec![mesh],
-            nodes: vec![leaf(named("cube"), None, 0)],
-            roots: vec![0],
-            ..Scene::default()
-        },
-        ..BreadFile::default()
     }
 }
 
@@ -351,10 +502,34 @@ fn valid_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance/valid")
 }
 
+/// `bytes` with the `skipped` chunks written right after the scene chunk.
+fn with_skipped(bytes: Vec<u8>, skipped: &[Extra]) -> Vec<u8> {
+    if skipped.is_empty() {
+        return bytes;
+    }
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut writer = BreadWriter::new(Vec::new()).expect("the header writes");
+    let mut first = true;
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        writer
+            .chunk(chunk.tag, chunk.version, &chunk.payload)
+            .expect("the chunk writes");
+        if std::mem::take(&mut first) {
+            for &(tag, version, payload) in skipped {
+                writer
+                    .chunk(tag, version, payload)
+                    .expect("the chunk writes");
+            }
+        }
+    }
+    writer.finish().expect("the file ends")
+}
+
 /// The bytes of a case and the JSON that describes them.
 fn generate(case: &Case) -> (Vec<u8>, String) {
     let file = (case.file)();
     let bytes = write_file(&file, Vec::new()).expect("the case writes");
+    let bytes = with_skipped(bytes, case.skipped);
     let back = read_file(bytes.as_slice()).expect("the case reads");
     assert!(back == file, "{} does not come back the same", case.name);
     let json = describe(case.description, &back);
@@ -384,6 +559,26 @@ fn the_files_match_their_cases() {
             case.name
         );
     }
+}
+
+/// The rotated triangle only means something if the codec stores it from
+/// another corner. Its mesh chunk then lists one rotation: the payload ends
+/// with a count of 1, a gap and a corner.
+#[test]
+fn the_rotated_triangle_is_stored_rotated() {
+    let case = CASES.iter().find(|case| case.name == "rotated-triangle");
+    let file = (case.expect("the case exists").file)();
+    let bytes = write_file(&file, Vec::new()).expect("the case writes");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        if chunk.tag == MESH_TAG {
+            let payload = &chunk.payload;
+            let count = &payload[payload.len() - 9..payload.len() - 5];
+            assert_eq!(count, 1u32.to_le_bytes(), "the codec rotates the triangle");
+            return;
+        }
+    }
+    panic!("the file has no mesh chunk");
 }
 
 #[test]
