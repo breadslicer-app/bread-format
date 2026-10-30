@@ -606,7 +606,8 @@ A reader that reads `SPRV`:
   leaf of an entry there.
 
 The preview is for showing, not for editing. A program that rebuilds the supports from their
-document SHOULD ignore the preview, so that what it shows and edits always comes from the document.
+document MUST edit the rebuilt supports, never the preview, and SHOULD show them once they are
+rebuilt. It MAY show the preview until then, for example to open a large file quickly.
 
 A reader that skips `SPRV` reads the same file: the support leaves show no mesh, as
 [`SUPP`](#supp-supports) says.
