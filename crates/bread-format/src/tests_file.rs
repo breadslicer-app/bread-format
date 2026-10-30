@@ -4,32 +4,43 @@
  */
 
 use crate::app::{
-    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, LeafDocument, SETTINGS_TAG,
-    SUPPORTS_TAG,
+    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, HollowEntry,
+    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, SupportEntry, encode_hollows,
 };
 use crate::container::{BreadReader, BreadWriter, ChunkTag};
 use crate::file::{BreadFile, ReadFileError, WriteFileError, read_file, write_file};
-use crate::mesh::{DecodeMeshError, MESH_TAG};
-use crate::scene::{DecodeSceneError, SCENE_TAG};
+use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
+use crate::scene::{DecodeSceneError, SCENE_TAG, SCENE_VERSION};
 use crate::tests_scene::scene;
 
-fn document(leaf: usize, text: &str) -> LeafDocument {
-    LeafDocument {
-        leaf,
+fn supports(model: usize, support: usize, text: &str) -> SupportEntry {
+    SupportEntry {
+        model,
+        support,
         generator: "df".into(),
         version: 1,
         document: text.as_bytes().to_vec(),
     }
 }
 
-/// The test scene with settings, supports on its leaf with an empty mesh,
-/// and a hollow.
+fn hollow(model: usize, original: usize, text: &str) -> HollowEntry {
+    HollowEntry {
+        model,
+        original,
+        generator: "df".into(),
+        version: 1,
+        document: text.as_bytes().to_vec(),
+    }
+}
+
+/// The test scene with settings, and a hollowed model with supports shown
+/// by the leaf with an empty mesh.
 fn file() -> BreadFile {
     BreadFile {
         scene: scene(),
         settings: Some(b"version = 1\nprinter = \"example\"\n".to_vec()),
-        supports: vec![document(2, "tips, trunks and rafts")],
-        hollows: vec![document(4, "original mesh, settings and drains")],
+        supports: vec![supports(1, 2, "tips, trunks and rafts")],
+        hollows: vec![hollow(1, 0, "settings and drains")],
     }
 }
 
@@ -124,8 +135,14 @@ fn unknown_chunks_are_skipped() {
 #[test]
 fn a_newer_version_or_version_0_is_refused() {
     let bytes = write(&file());
-    for tag in [SCENE_TAG, SETTINGS_TAG, SUPPORTS_TAG, HOLLOWS_TAG, MESH_TAG] {
-        for bad in [0, 2] {
+    for (tag, supported) in [
+        (SCENE_TAG, SCENE_VERSION),
+        (SETTINGS_TAG, SETTINGS_VERSION),
+        (SUPPORTS_TAG, SUPPORTS_VERSION),
+        (HOLLOWS_TAG, HOLLOWS_VERSION),
+        (MESH_TAG, MESH_VERSION),
+    ] {
+        for bad in [0, supported + 1] {
             let changed = rewrite(&bytes, |t, version, payload| {
                 vec![(t, if t == tag { bad } else { version }, payload)]
             });
@@ -138,6 +155,35 @@ fn a_newer_version_or_version_0_is_refused() {
             );
         }
     }
+}
+
+#[test]
+fn draft_supports_and_hollows_are_skipped() {
+    let file = file();
+    // Version 1 entries named one leaf each, with no part.
+    let draft = rewrite(&write(&file), |tag, version, payload| {
+        if tag == SUPPORTS_TAG || tag == HOLLOWS_TAG {
+            vec![(tag, 1, b"\x01\0\0\0\x02\0\0\0an older envelope".to_vec())]
+        } else {
+            vec![(tag, version, payload)]
+        }
+    });
+    let back = read_file(draft.as_slice()).unwrap();
+    assert_eq!(back.scene, file.scene);
+    assert_eq!(back.settings, file.settings);
+    assert!(back.supports.is_empty() && back.hollows.is_empty());
+    // A draft chunk still counts as the one supports chunk of the file.
+    let doubled = rewrite(&write(&file), |tag, version, payload| {
+        let mut chunks = vec![(tag, version, payload)];
+        if tag == SUPPORTS_TAG {
+            chunks.push((tag, 1, Vec::new()));
+        }
+        chunks
+    });
+    assert!(matches!(
+        read_file(doubled.as_slice()),
+        Err(ReadFileError::ChunkCount { tag, count: 2 }) if tag == SUPPORTS_TAG
+    ));
 }
 
 #[test]
@@ -206,8 +252,8 @@ fn a_reader_that_skips_the_application_chunks_sees_the_same_scene() {
         bytes = without(&bytes, tag);
     }
     let back = read_file(bytes.as_slice()).unwrap();
-    // The supports leaf is still there with its empty mesh, and the hollowed
-    // leaf with its hollow.
+    // The support leaf is still there with its empty mesh, and the hollowed
+    // model with its hollow.
     assert_eq!(back.scene, file.scene);
     assert_eq!(back.settings, None);
     assert!(back.supports.is_empty() && back.hollows.is_empty());
@@ -216,7 +262,7 @@ fn a_reader_that_skips_the_application_chunks_sees_the_same_scene() {
 #[test]
 fn a_support_leaf_must_show_an_empty_mesh() {
     let mut file = file();
-    file.supports = vec![document(1, "supports on a leaf with a mesh")];
+    file.supports = vec![supports(0, 1, "supports on a leaf with a mesh")];
     assert!(matches!(
         write_file(&file, Vec::new()),
         Err(WriteFileError::SupportMeshNotEmpty { leaf: 1 })
@@ -224,15 +270,40 @@ fn a_support_leaf_must_show_an_empty_mesh() {
 }
 
 #[test]
-fn documents_must_name_a_leaf() {
-    let mut supports = file();
-    supports.supports = vec![document(3, "supports on a group")];
+fn a_support_leaf_is_no_hollowed_model() {
+    let mut broken = file();
+    broken
+        .hollows
+        .push(hollow(2, 2, "a hollow of the supports"));
     assert!(matches!(
-        write_file(&supports, Vec::new()),
+        write_file(&broken, Vec::new()),
+        Err(WriteFileError::SupportIsHollowed { leaf: 2 })
+    ));
+    // Each chunk is fine on its own; only the two together break the rule.
+    let hollows = encode_hollows(&broken.hollows, &broken.scene).unwrap();
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        if tag == HOLLOWS_TAG {
+            vec![(tag, version, hollows.clone())]
+        } else {
+            vec![(tag, version, payload)]
+        }
+    });
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::SupportIsHollowed { leaf: 2 })
+    ));
+}
+
+#[test]
+fn documents_must_name_a_leaf() {
+    let mut with_supports = file();
+    with_supports.supports = vec![supports(3, 2, "supports on a group")];
+    assert!(matches!(
+        write_file(&with_supports, Vec::new()),
         Err(WriteFileError::Supports(EncodeDocumentsError::NotALeaf))
     ));
     let mut hollows = file();
-    hollows.hollows = vec![document(9, "a hollow outside the scene")];
+    hollows.hollows = vec![hollow(9, 0, "a hollow outside the scene")];
     assert!(matches!(
         write_file(&hollows, Vec::new()),
         Err(WriteFileError::Hollows(EncodeDocumentsError::NotALeaf))
