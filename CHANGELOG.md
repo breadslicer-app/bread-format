@@ -4,6 +4,13 @@ What changes in each release of the `bread-format` crate. The format itself is d
 [SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
 read files of an older release differently, and each release says how.
 
+## Unreleased
+
+- **Thumbnail** (`SPEC.md`, section 8): `BreadFile::thumbnail` carries the `THMB` chunk, a PNG,
+  without decoding it. `write_file` writes it as the first chunk. A file with two thumbnail chunks
+  is refused. `BreadFile` has a new field, so code that builds one with every field named needs
+  `thumbnail: None`.
+
 ## 0.1.0 (2026-10-30)
 
 The first release, for use as a git dependency by tag. It is not on crates.io yet.
