@@ -10,6 +10,13 @@ read files of an older release differently, and each release says how.
   without decoding it. `write_file` writes it as the first chunk. A file with two thumbnail chunks
   is refused. `BreadFile` has a new field, so code that builds one with every field named needs
   `thumbnail: None`.
+- **Support preview** (`SPEC.md`, section 9): `BreadFile::support_previews` carries the `SPRV`
+  chunk, the mesh of each support leaf's supports for readers that do not rebuild them, as
+  `SupportPreview { leaf, mesh }`. `write_file` writes it after the mesh chunks. Each preview must
+  name the support leaf of a supports entry, a leaf with an empty mesh, and no leaf twice; this is
+  checked when reading and when writing. A file whose supports chunk is a draft (version 1) opens
+  without its previews. `BreadFile` has a new field, so code that builds one with every field named
+  needs `support_previews: Vec::new()`.
 
 ## 0.1.0 (2026-10-30)
 

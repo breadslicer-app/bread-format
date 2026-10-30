@@ -25,8 +25,9 @@ use std::path::{Path, PathBuf};
 
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, DecodeMeshError, DecodeSceneError, HollowEntry,
-    MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG, Scene,
-    SupportEntry, THUMBNAIL_TAG, Transform, encode_mesh, read_file, write_file,
+    MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG,
+    SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, THUMBNAIL_TAG, Transform,
+    encode_mesh, read_file, write_file,
 };
 use sha2::{Digest, Sha256};
 
@@ -103,6 +104,14 @@ const CASES: &[Case] = &[
         name: "thumbnail",
         description: "The triangle file with a thumbnail, written as the first chunk: a PNG of                       2 x 2 pixels, three of them opaque and one transparent.",
         file: thumbnail,
+        skipped: &[],
+    },
+    Case {
+        name: "support-preview",
+        description: "A triangle model with supports whose support leaf shows an empty mesh, \
+                      and a preview of those supports: a reader that shows the preview shows \
+                      a post under the triangle.",
+        file: support_preview,
         skipped: &[],
     },
 ];
@@ -264,6 +273,62 @@ fn slicer_data() -> BreadFile {
             document: b"hollows document".to_vec(),
         }],
         thumbnail: None,
+        support_previews: Vec::new(),
+    }
+}
+
+/// A model on supports: the triangle, raised 5 above the plate, and its
+/// supports, a post kept as data whose preview reaches up to the triangle.
+fn support_preview() -> BreadFile {
+    let empty = Mesh {
+        meta: None,
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+    };
+    // A thin, three-sided post from the plate up to the model.
+    let post = Mesh {
+        meta: named("post"),
+        vertices: vec![
+            [1.0, 1.0, 0.0],
+            [2.0, 1.0, 0.0],
+            [1.0, 2.0, 0.0],
+            [1.0, 1.0, 5.0],
+            [2.0, 1.0, 5.0],
+            [1.0, 2.0, 5.0],
+        ],
+        triangles: vec![
+            [0, 2, 1],
+            [3, 4, 5],
+            [0, 1, 4],
+            [0, 4, 3],
+            [1, 2, 5],
+            [1, 5, 4],
+            [2, 0, 3],
+            [2, 3, 5],
+        ],
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![triangle_mesh([0, 1, 2]), empty],
+            nodes: vec![
+                leaf(named("model"), moved([0.0, 0.0, 5.0]), 0),
+                leaf(named("supports"), None, 1),
+            ],
+            roots: vec![0, 1],
+            ..Scene::default()
+        },
+        supports: vec![SupportEntry {
+            model: 0,
+            support: 1,
+            generator: "example".into(),
+            version: 1,
+            document: b"supports document".to_vec(),
+        }],
+        support_previews: vec![SupportPreview {
+            leaf: 1,
+            mesh: post,
+        }],
+        ..BreadFile::default()
     }
 }
 
@@ -511,6 +576,12 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ];
         document(fields, &entry.generator, entry.version, &entry.document)
     });
+    let previews = file.support_previews.iter().map(|preview| {
+        Json::Object(vec![
+            ("leaf", Json::index(preview.leaf)),
+            ("mesh", mesh(&preview.mesh)),
+        ])
+    });
     let json = Json::Object(vec![
         ("description", Json::text(description)),
         ("meta", meta(scene.meta.as_ref())),
@@ -526,6 +597,7 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ("supports", Json::List(supports.collect())),
         ("hollows", Json::List(hollows.collect())),
         ("thumbnail", payload(file.thumbnail.as_deref())),
+        ("support_previews", Json::List(previews.collect())),
     ]);
     let mut out = String::new();
     json.write(&mut out, 0);
@@ -626,6 +698,21 @@ fn the_thumbnail_is_the_first_chunk() {
     let first = first.expect("the file has a chunk");
     assert_eq!(first.tag, THUMBNAIL_TAG);
     assert_eq!(first.payload, THUMBNAIL_PNG);
+}
+
+/// The support preview comes after the mesh chunks, where the crate writes
+/// it, and holds one preview.
+#[test]
+fn the_support_preview_is_the_last_chunk() {
+    let bytes = std::fs::read(valid_dir().join("support-preview.bread")).expect("the file exists");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut last = None;
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        last = Some(chunk);
+    }
+    let last = last.expect("the file has chunks");
+    assert_eq!(last.tag, SUPPORT_PREVIEW_TAG);
+    assert_eq!(last.payload[..4], 1u32.to_le_bytes());
 }
 
 /// A file every reader must refuse: its name, what is wrong with it, the

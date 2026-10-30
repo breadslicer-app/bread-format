@@ -21,6 +21,7 @@ what it reads matches the JSON.
 | `supports` | the `SUPP` entries, in order (below) |
 | `hollows` | the `HOLW` entries, in order (below) |
 | `thumbnail` | the `THMB` payload, a PNG: `null` when there is none, or its `size` in bytes and its `sha256` |
+| `support_previews` | the `SPRV` previews, in order: each has `leaf`, the support leaf's node index, and `mesh`, as for the meshes |
 
 Each mesh:
 

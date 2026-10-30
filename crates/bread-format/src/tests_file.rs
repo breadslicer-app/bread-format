@@ -13,7 +13,11 @@ use crate::file::{
     write_file,
 };
 use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
+use crate::preview::{
+    DecodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, SupportPreview,
+};
 use crate::scene::{DecodeSceneError, SCENE_TAG, SCENE_VERSION};
+use crate::tests_preview::preview;
 use crate::tests_scene::scene;
 
 fn supports(model: usize, support: usize, text: &str) -> SupportEntry {
@@ -41,7 +45,7 @@ fn hollow(model: usize, original: usize, text: &str) -> HollowEntry {
 const THUMBNAIL: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
 
 /// The test scene with a thumbnail and settings, and a hollowed model with
-/// supports shown by the leaf with an empty mesh.
+/// supports shown by the leaf with an empty mesh, and their preview.
 fn file() -> BreadFile {
     BreadFile {
         scene: scene(),
@@ -49,6 +53,7 @@ fn file() -> BreadFile {
         supports: vec![supports(1, 2, "tips, trunks and rafts")],
         hollows: vec![hollow(1, 0, "settings and drains")],
         thumbnail: Some(THUMBNAIL.to_vec()),
+        support_previews: vec![preview()],
     }
 }
 
@@ -112,7 +117,8 @@ fn chunks_come_in_order() {
             HOLLOWS_TAG,
             MESH_TAG,
             MESH_TAG,
-            MESH_TAG
+            MESH_TAG,
+            SUPPORT_PREVIEW_TAG
         ]
     );
 }
@@ -151,6 +157,7 @@ fn a_newer_version_or_version_0_is_refused() {
         (SUPPORTS_TAG, SUPPORTS_VERSION),
         (HOLLOWS_TAG, HOLLOWS_VERSION),
         (MESH_TAG, MESH_VERSION),
+        (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
     ] {
         for bad in [0, supported + 1] {
             let changed = rewrite(&bytes, |t, version, payload| {
@@ -182,6 +189,8 @@ fn draft_supports_and_hollows_are_skipped() {
     assert_eq!(back.scene, file.scene);
     assert_eq!(back.settings, file.settings);
     assert!(back.supports.is_empty() && back.hollows.is_empty());
+    // The previews of draft supports cannot be checked, so they go too.
+    assert!(back.support_previews.is_empty());
     // A draft chunk still counts as the one supports chunk of the file.
     let doubled = rewrite(&write(&file), |tag, version, payload| {
         let mut chunks = vec![(tag, version, payload)];
@@ -214,6 +223,7 @@ fn two_of_a_chunk_that_comes_once_are_refused() {
         SETTINGS_TAG,
         SUPPORTS_TAG,
         HOLLOWS_TAG,
+        SUPPORT_PREVIEW_TAG,
     ] {
         let doubled = rewrite(&bytes, |t, version, payload| {
             vec![(t, version, payload); if t == tag { 2 } else { 1 }]
@@ -246,6 +256,10 @@ fn a_damaged_chunk_is_reported() {
     assert!(matches!(
         read_file(cut(HOLLOWS_TAG).as_slice()),
         Err(ReadFileError::Hollows(DecodeDocumentsError::Malformed))
+    ));
+    assert!(matches!(
+        read_file(cut(SUPPORT_PREVIEW_TAG).as_slice()),
+        Err(ReadFileError::Previews(DecodePreviewsError::Malformed))
     ));
     assert!(matches!(
         read_file(cut(MESH_TAG).as_slice()),
@@ -281,7 +295,7 @@ fn a_thumbnail_is_carried_without_being_read() {
 fn a_reader_that_skips_the_application_chunks_sees_the_same_scene() {
     let file = file();
     let mut bytes = write(&file);
-    for tag in [SETTINGS_TAG, SUPPORTS_TAG, HOLLOWS_TAG] {
+    for tag in [SETTINGS_TAG, SUPPORTS_TAG, HOLLOWS_TAG, SUPPORT_PREVIEW_TAG] {
         bytes = without(&bytes, tag);
     }
     let back = read_file(bytes.as_slice()).unwrap();
@@ -290,6 +304,7 @@ fn a_reader_that_skips_the_application_chunks_sees_the_same_scene() {
     assert_eq!(back.scene, file.scene);
     assert_eq!(back.settings, None);
     assert!(back.supports.is_empty() && back.hollows.is_empty());
+    assert!(back.support_previews.is_empty());
 }
 
 #[test]
@@ -341,4 +356,39 @@ fn documents_must_name_a_leaf() {
         write_file(&hollows, Vec::new()),
         Err(WriteFileError::Hollows(EncodeDocumentsError::NotALeaf))
     ));
+}
+
+#[test]
+fn a_preview_shows_the_support_leaf_of_an_entry() {
+    // Without supports, the support leaf is a leaf like any other.
+    let mut lonely = file();
+    lonely.supports.clear();
+    assert!(matches!(
+        write_file(&lonely, Vec::new()),
+        Err(WriteFileError::PreviewWithoutSupports { leaf: 2 })
+    ));
+    let bytes = without(&write(&file()), SUPPORTS_TAG);
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::PreviewWithoutSupports { leaf: 2 })
+    ));
+    // Some support leaves may go without a preview.
+    let mut bare = file();
+    bare.support_previews.clear();
+    let bytes = write(&bare);
+    assert!(!tags(&bytes).contains(&SUPPORT_PREVIEW_TAG));
+    assert_eq!(read_file(bytes.as_slice()).unwrap(), bare);
+}
+
+#[test]
+fn a_reader_that_skips_the_preview_sees_the_same_file() {
+    let file = file();
+    let back = read_file(without(&write(&file), SUPPORT_PREVIEW_TAG).as_slice()).unwrap();
+    assert_eq!(
+        back,
+        BreadFile {
+            support_previews: Vec::<SupportPreview>::new(),
+            ..file
+        }
+    );
 }
