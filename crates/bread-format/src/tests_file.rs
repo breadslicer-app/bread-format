@@ -10,7 +10,7 @@ use crate::app::{
 use crate::container::{BreadReader, BreadWriter, ChunkTag};
 use crate::file::{
     BreadFile, ReadFileError, THUMBNAIL_TAG, THUMBNAIL_VERSION, WriteFileError, read_file,
-    write_file,
+    supported_version, write_file,
 };
 use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
 use crate::preview::{
@@ -132,6 +132,23 @@ fn a_file_without_application_data_has_no_application_chunks() {
     let bytes = write(&file);
     assert_eq!(tags(&bytes), [SCENE_TAG, MESH_TAG, MESH_TAG, MESH_TAG]);
     assert_eq!(read_file(bytes.as_slice()).unwrap(), file);
+}
+
+#[test]
+fn supported_versions_are_the_ones_written() {
+    for (tag, version) in [
+        (THUMBNAIL_TAG, THUMBNAIL_VERSION),
+        (SCENE_TAG, SCENE_VERSION),
+        (SETTINGS_TAG, SETTINGS_VERSION),
+        (SUPPORTS_TAG, SUPPORTS_VERSION),
+        (HOLLOWS_TAG, HOLLOWS_VERSION),
+        (MESH_TAG, MESH_VERSION),
+        (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
+    ] {
+        assert_eq!(supported_version(tag), Some(version), "{tag}");
+    }
+    assert_eq!(supported_version(ChunkTag(*b"ZZZZ")), None);
+    assert_eq!(supported_version(ChunkTag(*b"xmpl")), None);
 }
 
 #[test]

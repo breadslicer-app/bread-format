@@ -206,6 +206,23 @@ impl From<ReadBreadError> for ReadFileError {
     }
 }
 
+/// The newest version of the chunk `tag` this build reads, or `None` for a
+/// tag it does not know, which a reader skips. Every version from 1 up to it
+/// is read, though older supports and hollows chunks are skipped; any other
+/// version makes the file unreadable.
+pub fn supported_version(tag: ChunkTag) -> Option<u16> {
+    Some(match tag {
+        THUMBNAIL_TAG => THUMBNAIL_VERSION,
+        SCENE_TAG => SCENE_VERSION,
+        SETTINGS_TAG => SETTINGS_VERSION,
+        SUPPORTS_TAG => SUPPORTS_VERSION,
+        HOLLOWS_TAG => HOLLOWS_VERSION,
+        MESH_TAG => MESH_VERSION,
+        SUPPORT_PREVIEW_TAG => SUPPORT_PREVIEW_VERSION,
+        _ => return None,
+    })
+}
+
 /// Writes `file` as a `.bread` file to `out`, handing `out` back. When it
 /// fails, what it wrote to `out` is not a valid file.
 pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileError> {
@@ -268,15 +285,8 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     );
     let mut meshes = Vec::new();
     while let Some(chunk) = reader.next_chunk()? {
-        let supported = match chunk.tag {
-            THUMBNAIL_TAG => THUMBNAIL_VERSION,
-            SCENE_TAG => SCENE_VERSION,
-            SETTINGS_TAG => SETTINGS_VERSION,
-            SUPPORTS_TAG => SUPPORTS_VERSION,
-            HOLLOWS_TAG => HOLLOWS_VERSION,
-            MESH_TAG => MESH_VERSION,
-            SUPPORT_PREVIEW_TAG => SUPPORT_PREVIEW_VERSION,
-            _ => continue,
+        let Some(supported) = supported_version(chunk.tag) else {
+            continue;
         };
         if chunk.version == 0 || chunk.version > supported {
             return Err(ReadFileError::ChunkVersion {
