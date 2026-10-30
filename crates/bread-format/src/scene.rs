@@ -69,6 +69,18 @@ pub struct Scene {
     pub roots: Vec<usize>,
 }
 
+impl Scene {
+    /// The mesh the node `node` shows, or `None` when it is not a leaf.
+    pub fn leaf_mesh(&self, node: usize) -> Option<&Mesh> {
+        let mesh = match self.nodes.get(node)?.kind {
+            NodeKind::Leaf { mesh } => mesh,
+            NodeKind::SharedLeaf { resource } => *self.mesh_resources.get(resource)?,
+            NodeKind::Group { .. } | NodeKind::Reference { .. } => return None,
+        };
+        self.meshes.get(mesh)
+    }
+}
+
 /// A node of the scene.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
