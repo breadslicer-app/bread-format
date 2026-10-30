@@ -17,6 +17,9 @@ read files of an older release differently, and each release says how.
   checked when reading and when writing. A file whose supports chunk is a draft (version 1) opens
   without its previews. `BreadFile` has a new field, so code that builds one with every field named
   needs `support_previews: Vec::new()`.
+- **`supported_version(tag)`**: the newest version of a chunk this build reads, or `None` for a tag
+  it does not know and skips. `read_file` uses it, so other readers built on `BreadReader`, such as
+  the JavaScript binding, check chunk versions the same way.
 
 ## 0.1.0 (2026-10-30)
 
