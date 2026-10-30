@@ -1,2 +1,4 @@
 # Build artifacts
 /target
+/bindings/js/dist
+node_modules/
