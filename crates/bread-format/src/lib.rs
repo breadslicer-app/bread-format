@@ -15,8 +15,9 @@
 //! four-byte tag, its own version, and a payload compressed with zstd and
 //! guarded by a CRC-32. [`container`] reads and writes chunks without knowing
 //! what they hold; [`scene`] and [`mesh`] are the codecs of the scene chunk
-//! and of the mesh chunks it places, and [`app`] carries the documents of
-//! the application chunks.
+//! and of the mesh chunks it places, [`app`] carries the documents of the
+//! application chunks, and [`preview`] the meshes that show supports to
+//! readers that do not rebuild them.
 
 pub mod app;
 mod bytes;
@@ -24,6 +25,7 @@ pub mod container;
 pub mod file;
 pub mod mesh;
 mod meta;
+pub mod preview;
 pub mod scene;
 
 #[cfg(test)]
@@ -34,6 +36,8 @@ mod tests_container;
 mod tests_file;
 #[cfg(test)]
 mod tests_mesh;
+#[cfg(test)]
+mod tests_preview;
 #[cfg(test)]
 mod tests_scene;
 
@@ -51,6 +55,10 @@ pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };
 pub use meta::Meta;
+pub use preview::{
+    DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
+    SupportPreview, decode_previews, encode_previews,
+};
 pub use scene::{
     DecodeSceneError, EncodeSceneError, Node, NodeKind, SCENE_TAG, SCENE_VERSION, Scene, Transform,
     decode_scene, encode_scene,
