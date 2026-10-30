@@ -420,8 +420,8 @@ file](#44-reading-a-file)).
 | `SCNE` | 1 | exactly one | the scene: its nodes, their transforms, and the meshes they use | [5](#5-scene-scne) |
 | `MESH` | 1 | any number | one triangle mesh | [6](#6-mesh-mesh) |
 | `PROJ` | 1 | at most one | application data: project settings | [7.3](#73-application-chunks) |
-| `SUPP` | 1 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
-| `HOLW` | 1 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
+| `SUPP` | 2 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
+| `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
 
 *Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
 that holds a different number of chunks of that tag than *Per file* allows.
@@ -446,8 +446,8 @@ private. Nothing guarantees that a chunk survives another program's edits.
 
 Application chunks carry documents that belong to one program, such as a slicer's editable
 supports. Their tags are official, so they never clash, but this document describes only their
-envelope: which part of the scene a document belongs to, and who wrote it. What a document holds is
-up to the program that wrote it.
+envelope: which parts of the scene a document is about, the role each part plays, and who wrote the
+document. What a document holds is up to the program that wrote it.
 
 A reader that does not use them MAY skip them, and the file still reads right: the scene and the
 meshes say everything such a reader shows. Below, each chunk says what that is. The three
@@ -464,40 +464,55 @@ A reader that skips `PROJ` sees the same scene, without the settings it was prep
 
 #### `SUPP` and `HOLW`: the envelope
 
-Both chunks are a list of entries, one per leaf of the scene:
+This section describes version 2 of both chunks. Version 1, used only while this document was a
+draft, named a single leaf per entry. A reader that meets it MAY skip it, as it may skip any
+application chunk.
+
+Both chunks are a list of entries. Each entry is about one model, the leaf of the model as it
+prints, and names one more part of the scene, whose role each chunk below gives:
 
 | Field | Type | Meaning |
 |---|---|---|
 | entries | count | how many entries follow |
-| leaf | `u32` | the leaf's node index in the scene chunk ([5](#5-scene-scne)) |
+| model | `u32` | the node index of the model's leaf in the scene chunk ([5](#5-scene-scne)) |
+| part | `u32` | in `SUPP`, the node index of the support leaf; in `HOLW`, the mesh index of the original ([5.1](#51-layout)) |
 | generator | byte string | the name of what wrote the document, as UTF-8 text, such as `df` |
 | document version | `u32` | the generator's own version of the document |
 | document | byte string | the document |
 
-The last four fields repeat for every entry, so each entry takes at least 16 bytes. A reader that
-reads one of these chunks:
+The last five fields repeat for every entry, so each entry takes at least 20 bytes. A model can have
+an entry in each chunk: a hollowed model with supports has one in `HOLW` and one in `SUPP`. A reader
+that reads these chunks:
 
-- MUST refuse it as malformed if a generator name is not valid UTF-8;
-- MUST refuse the file if an entry's leaf index names no node of the scene, or a node that is not a
-  leaf;
+- MUST refuse a chunk as malformed if a generator name is not valid UTF-8;
+- MUST refuse the file if a model or a support leaf names no node of the scene, or a node that is
+  not a leaf, or if an original names no mesh;
+- MUST refuse the file if two entries of one chunk name the same model;
+- MUST refuse the file if two entries name the same support leaf, or if a support leaf is also the
+  model of an entry in either chunk;
 - SHOULD treat an entry whose generator it does not know, or whose document version is newer than
   the ones it supports, as if the entry were absent.
 
 #### `SUPP`: supports
 
-Each entry is a leaf that shows supports, and its document describes them: tips, trunks, joints,
-rafts and the settings they were built with. The leaf is stored with an empty mesh, one with no
-vertices and no triangles, and the program that wrote the document rebuilds the mesh from it, so the
-supports stay editable.
+Each entry names the model the supports stand on and the leaf that shows them. Its document
+describes the supports: tips, trunks, joints, rafts and the settings they were built with. The
+support leaf is stored with an empty mesh, one with no vertices and no triangles, and the program
+that wrote the document rebuilds the mesh from it, so the supports stay editable.
 
 A reader that skips `SUPP` sees the support leaves with no mesh: it shows the models without their
 supports. This document does not yet give such readers a preview of the supports.
 
 #### `HOLW`: hollowed models
 
-Each entry is a leaf whose model was hollowed, and its document describes how: the mesh the model
-was hollowed from, the hollowing settings and the drain holes. Unlike a support leaf, the leaf keeps
-its mesh, the hollow, so the program that wrote the document can hollow the original again with new
-settings or drains.
+Each entry names a hollowed model and its original, the mesh the model was hollowed from. The
+model's leaf shows the hollow, which is what prints. The document describes the rest of how it was
+made, the hollowing settings and the drain holes, so the program that wrote it can hollow the
+original again with new settings or drains.
 
-A reader that skips `HOLW` sees the hollowed models, as they will print.
+The original is a mesh of the file like any other, but usually no leaf shows it: a reader that does
+not use `HOLW` keeps it without drawing it ([5.4](#54-placing-the-meshes)), so it never appears on
+top of the hollow. A leaf may still show it, for example a solid copy of the same model, since a
+mesh several leaves show is stored once.
+
+A reader that skips `HOLW` sees the hollowed models, as they will print, without their originals.
