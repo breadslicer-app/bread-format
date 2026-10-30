@@ -24,9 +24,9 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use bread_format::{
-    BreadFile, BreadReader, BreadWriter, ChunkTag, HollowEntry, MESH_TAG, Mesh, Meta, Node,
-    NodeKind, ReadBreadError, ReadFileError, SCENE_TAG, Scene, SupportEntry, Transform, read_file,
-    write_file,
+    BreadFile, BreadReader, BreadWriter, ChunkTag, DecodeMeshError, DecodeSceneError, HollowEntry,
+    MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG, Scene,
+    SupportEntry, Transform, encode_mesh, read_file, write_file,
 };
 use sha2::{Digest, Sha256};
 
@@ -659,6 +659,36 @@ const INVALID: &[Invalid] = &[
         chunk: Some(MESH_TAG),
         bytes: newer_chunk,
     },
+    Invalid {
+        name: "no-such-vertex",
+        description: "A mesh of 3 vertices whose triangle names vertex 3, which it does not have.",
+        reason: "no-such-vertex",
+        chunk: Some(MESH_TAG),
+        bytes: no_such_vertex,
+    },
+    Invalid {
+        name: "no-such-mesh",
+        description: "A scene of one mesh whose leaf names mesh 1, which does not exist.",
+        reason: "malformed",
+        chunk: Some(SCENE_TAG),
+        bytes: no_such_mesh,
+    },
+    Invalid {
+        name: "two-scenes",
+        description: "The triangle file with its scene chunk written twice.",
+        reason: "chunk-count",
+        chunk: Some(SCENE_TAG),
+        bytes: two_scenes,
+    },
+    Invalid {
+        name: "huge-vertex-count",
+        description: "The triangle file with the vertex count of its mesh set to 2^32 - 1, far \
+                      more than its vertex buffer can hold: a reader that allocates for it up \
+                      front asks for 48 GiB.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: huge_vertex_count,
+    },
 ];
 
 /// A file taken apart field by field, to be damaged on purpose.
@@ -783,6 +813,87 @@ fn newer_chunk() -> Vec<u8> {
     file.bytes()
 }
 
+/// A chunk to write as it is: its tag, version and payload.
+type Payload = (ChunkTag, u16, Vec<u8>);
+
+/// The chunks of the valid triangle file: a scene chunk, then a mesh chunk.
+fn triangle_payloads() -> Vec<Payload> {
+    let bytes = write_file(&triangle(), Vec::new()).expect("the triangle writes");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut chunks = Vec::new();
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        chunks.push((chunk.tag, chunk.version, chunk.payload));
+    }
+    chunks
+}
+
+/// A file of `chunks`, each written as it is.
+fn file_of(chunks: &[Payload]) -> Vec<u8> {
+    let mut writer = BreadWriter::new(Vec::new()).expect("the header writes");
+    for (tag, version, payload) in chunks {
+        writer
+            .chunk(*tag, *version, payload)
+            .expect("the chunk writes");
+    }
+    writer.finish().expect("the file ends")
+}
+
+/// Where the vertices of a mesh payload without metadata end: after the
+/// metadata flag, the vertex count, and the vertex buffer's length and bytes.
+fn vertices_end(payload: &[u8]) -> usize {
+    assert_eq!(payload[0], 0, "the mesh has no metadata");
+    let len = u32::from_le_bytes(payload[5..9].try_into().unwrap());
+    9 + usize::try_from(len).unwrap()
+}
+
+/// The vertices of the triangle with the triangles of a mesh of 4 vertices,
+/// whose triangle names the fourth one.
+fn no_such_vertex() -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    let four = Mesh {
+        meta: None,
+        vertices: vec![
+            [0.0, 0.0, 0.0],
+            [10.0, 0.0, 0.0],
+            [0.0, 10.0, 0.0],
+            [0.0, 0.0, 10.0],
+        ],
+        triangles: vec![[0, 1, 3]],
+    };
+    let four = encode_mesh(&four).expect("the mesh encodes");
+    let mesh = &mut chunks[1].2;
+    mesh.truncate(vertices_end(mesh));
+    mesh.extend(&four[vertices_end(&four)..]);
+    file_of(&chunks)
+}
+
+/// The triangle's scene, written by hand with its leaf naming mesh 1.
+fn no_such_mesh() -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    let mut scene = vec![0]; // no metadata
+    scene.extend(1u32.to_le_bytes()); // one mesh chunk
+    scene.extend(0u32.to_le_bytes()); // no mesh resources
+    scene.extend(1u32.to_le_bytes()); // one record:
+    scene.extend([1, 0, 0]); // a leaf, no metadata, no transform,
+    scene.extend(1u32.to_le_bytes()); // showing mesh 1
+    scene.extend(1u32.to_le_bytes()); // one root:
+    scene.extend(0u32.to_le_bytes()); // node 0
+    chunks[0].2 = scene;
+    file_of(&chunks)
+}
+
+fn two_scenes() -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    chunks.insert(1, chunks[0].clone());
+    file_of(&chunks)
+}
+
+fn huge_vertex_count() -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    chunks[1].2[1..5].copy_from_slice(&u32::MAX.to_le_bytes());
+    file_of(&chunks)
+}
+
 /// The reason code of `err`, and the chunk it is about, as the README names
 /// them.
 fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
@@ -793,6 +904,12 @@ fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
         ReadFileError::File(ReadBreadError::Corrupt(tag)) => ("crc", Some(*tag)),
         ReadFileError::File(ReadBreadError::BadPayload(tag)) => ("bad-payload", Some(*tag)),
         ReadFileError::ChunkVersion { tag, .. } => ("version", Some(*tag)),
+        ReadFileError::ChunkCount { tag, .. } => ("chunk-count", Some(*tag)),
+        ReadFileError::Mesh(DecodeMeshError::Malformed) => ("malformed", Some(MESH_TAG)),
+        ReadFileError::Mesh(DecodeMeshError::VertexOutOfRange) => {
+            ("no-such-vertex", Some(MESH_TAG))
+        }
+        ReadFileError::Scene(DecodeSceneError::Malformed) => ("malformed", Some(SCENE_TAG)),
         other => panic!("no conformance file expects this error: {other}"),
     }
 }
