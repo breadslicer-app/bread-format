@@ -43,7 +43,10 @@ pub use app::{
     decode_supports, encode_hollows, encode_supports,
 };
 pub use container::{BreadReader, BreadWriter, Chunk, ChunkTag, ReadBreadError};
-pub use file::{BreadFile, ReadFileError, WriteFileError, read_file, write_file};
+pub use file::{
+    BreadFile, ReadFileError, THUMBNAIL_TAG, THUMBNAIL_VERSION, WriteFileError, read_file,
+    write_file,
+};
 pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };

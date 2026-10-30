@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-//! A whole `.bread` file: the scene chunk, the project settings, the supports
-//! and the hollows when there are any, then one mesh chunk per mesh of the
-//! scene, in its order.
+//! A whole `.bread` file: the thumbnail when there is one, the scene chunk,
+//! the project settings, the supports and the hollows when there are any, then
+//! one mesh chunk per mesh of the scene, in its order.
 //!
 //! Reading skips the chunks this build does not know, official or private,
 //! and writing leaves them out, as section 7.2 allows. It also skips supports
@@ -29,6 +29,14 @@ use crate::scene::{
     DecodeSceneError, EncodeSceneError, SCENE_TAG, SCENE_VERSION, Scene, decode_scene, encode_scene,
 };
 
+/// The tag of the thumbnail chunk, whose payload is a PNG file. Section 8
+/// asks writers to put it first, so a program that only wants the picture
+/// reads one chunk.
+pub const THUMBNAIL_TAG: ChunkTag = ChunkTag(*b"THMB");
+
+/// The thumbnail chunk version this build writes and reads.
+pub const THUMBNAIL_VERSION: u16 = 1;
+
 /// What a `.bread` file holds.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BreadFile {
@@ -40,6 +48,10 @@ pub struct BreadFile {
     pub supports: Vec<SupportEntry>,
     /// How hollowed models were made. Their leaves show the hollow.
     pub hollows: Vec<HollowEntry>,
+    /// A small picture of the file: a PNG, at most 512 x 512 and best
+    /// 256 x 256, in sRGB. It is carried without being read: the PNG is
+    /// neither checked nor decoded.
+    pub thumbnail: Option<Vec<u8>>,
 }
 
 /// Why a file could not be written.
@@ -173,6 +185,9 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     }
 
     let mut writer = BreadWriter::new(out)?;
+    if let Some(thumbnail) = &file.thumbnail {
+        writer.chunk(THUMBNAIL_TAG, THUMBNAIL_VERSION, thumbnail)?;
+    }
     writer.chunk(SCENE_TAG, SCENE_VERSION, &scene_payload)?;
     if let Some(settings) = &file.settings {
         writer.chunk(SETTINGS_TAG, SETTINGS_VERSION, settings)?;
@@ -193,11 +208,12 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
 /// Reads the `.bread` file in `input`.
 pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     let mut reader = BreadReader::new(input)?;
-    let (mut scenes, mut settings, mut supports, mut hollows) =
-        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let (mut thumbnails, mut scenes, mut settings, mut supports, mut hollows) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let mut meshes = Vec::new();
     while let Some(chunk) = reader.next_chunk()? {
         let supported = match chunk.tag {
+            THUMBNAIL_TAG => THUMBNAIL_VERSION,
             SCENE_TAG => SCENE_VERSION,
             SETTINGS_TAG => SETTINGS_VERSION,
             SUPPORTS_TAG => SUPPORTS_VERSION,
@@ -215,6 +231,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         // as the one chunk of its tag, but its payload is not read.
         let current = chunk.version == supported;
         match chunk.tag {
+            THUMBNAIL_TAG => thumbnails.push(chunk.payload),
             SCENE_TAG => scenes.push(chunk.payload),
             SETTINGS_TAG => settings.push(chunk.payload),
             SUPPORTS_TAG => supports.push(current.then_some(chunk.payload)),
@@ -226,6 +243,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         tag: SCENE_TAG,
         count: 0,
     })?;
+    let thumbnail = single(THUMBNAIL_TAG, thumbnails)?;
     let settings = single(SETTINGS_TAG, settings)?;
     let supports = single(SUPPORTS_TAG, supports)?.flatten();
     let hollows = single(HOLLOWS_TAG, hollows)?.flatten();
@@ -247,6 +265,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         settings,
         supports,
         hollows,
+        thumbnail,
     })
 }
 

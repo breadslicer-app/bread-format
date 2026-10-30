@@ -8,7 +8,10 @@ use crate::app::{
     SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, SupportEntry, encode_hollows,
 };
 use crate::container::{BreadReader, BreadWriter, ChunkTag};
-use crate::file::{BreadFile, ReadFileError, WriteFileError, read_file, write_file};
+use crate::file::{
+    BreadFile, ReadFileError, THUMBNAIL_TAG, THUMBNAIL_VERSION, WriteFileError, read_file,
+    write_file,
+};
 use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
 use crate::scene::{DecodeSceneError, SCENE_TAG, SCENE_VERSION};
 use crate::tests_scene::scene;
@@ -33,14 +36,19 @@ fn hollow(model: usize, original: usize, text: &str) -> HollowEntry {
     }
 }
 
-/// The test scene with settings, and a hollowed model with supports shown
-/// by the leaf with an empty mesh.
+/// The PNG signature and a few bytes that stand for the picture: the crate
+/// never decodes it.
+const THUMBNAIL: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
+
+/// The test scene with a thumbnail and settings, and a hollowed model with
+/// supports shown by the leaf with an empty mesh.
 fn file() -> BreadFile {
     BreadFile {
         scene: scene(),
         settings: Some(b"version = 1\nprinter = \"example\"\n".to_vec()),
         supports: vec![supports(1, 2, "tips, trunks and rafts")],
         hollows: vec![hollow(1, 0, "settings and drains")],
+        thumbnail: Some(THUMBNAIL.to_vec()),
     }
 }
 
@@ -97,6 +105,7 @@ fn chunks_come_in_order() {
     assert_eq!(
         tags(&write(&file())),
         [
+            THUMBNAIL_TAG,
             SCENE_TAG,
             SETTINGS_TAG,
             SUPPORTS_TAG,
@@ -136,6 +145,7 @@ fn unknown_chunks_are_skipped() {
 fn a_newer_version_or_version_0_is_refused() {
     let bytes = write(&file());
     for (tag, supported) in [
+        (THUMBNAIL_TAG, THUMBNAIL_VERSION),
         (SCENE_TAG, SCENE_VERSION),
         (SETTINGS_TAG, SETTINGS_VERSION),
         (SUPPORTS_TAG, SUPPORTS_VERSION),
@@ -198,7 +208,13 @@ fn a_file_without_a_scene_is_refused() {
 #[test]
 fn two_of_a_chunk_that_comes_once_are_refused() {
     let bytes = write(&file());
-    for tag in [SCENE_TAG, SETTINGS_TAG, SUPPORTS_TAG, HOLLOWS_TAG] {
+    for tag in [
+        THUMBNAIL_TAG,
+        SCENE_TAG,
+        SETTINGS_TAG,
+        SUPPORTS_TAG,
+        HOLLOWS_TAG,
+    ] {
         let doubled = rewrite(&bytes, |t, version, payload| {
             vec![(t, version, payload); if t == tag { 2 } else { 1 }]
         });
@@ -242,6 +258,23 @@ fn a_damaged_chunk_is_reported() {
             found: 0
         }))
     ));
+}
+
+#[test]
+fn a_thumbnail_is_carried_without_being_read() {
+    // Section 8.2: what the thumbnail holds never makes a file unreadable.
+    for picture in [&b""[..], b"not a PNG at all"] {
+        let mut file = file();
+        file.thumbnail = Some(picture.to_vec());
+        let bytes = write(&file);
+        assert_eq!(read_file(bytes.as_slice()).unwrap(), file);
+    }
+    // Without one, the file has no thumbnail chunk and reads the same.
+    let bytes = without(&write(&file()), THUMBNAIL_TAG);
+    assert_eq!(tags(&bytes)[0], SCENE_TAG);
+    let back = read_file(bytes.as_slice()).unwrap();
+    assert_eq!(back.thumbnail, None);
+    assert_eq!(back.scene, file().scene);
 }
 
 #[test]

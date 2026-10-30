@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, DecodeMeshError, DecodeSceneError, HollowEntry,
     MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG, Scene,
-    SupportEntry, Transform, encode_mesh, read_file, write_file,
+    SupportEntry, THUMBNAIL_TAG, Transform, encode_mesh, read_file, write_file,
 };
 use sha2::{Digest, Sha256};
 
@@ -99,6 +99,22 @@ const CASES: &[Case] = &[
         file: slicer_data,
         skipped: &[],
     },
+    Case {
+        name: "thumbnail",
+        description: "The triangle file with a thumbnail, written as the first chunk: a PNG of                       2 x 2 pixels, three of them opaque and one transparent.",
+        file: thumbnail,
+        skipped: &[],
+    },
+];
+
+/// A PNG of 2 x 2 pixels, 8-bit RGBA: crust brown and crumb on top, crumb
+/// and a transparent pixel below.
+const THUMBNAIL_PNG: &[u8] = &[
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x08, 0x06, 0x00, 0x00, 0x00, 0x72, 0xb6, 0x0d,
+    0x24, 0x00, 0x00, 0x00, 0x17, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xe8, 0x8e, 0xd2, 0xfe,
+    0xff, 0xe9, 0xda, 0xec, 0xff, 0x0c, 0x60, 0x82, 0x81, 0x81, 0x01, 0x00, 0x5c, 0x5c, 0x08, 0xd4,
+    0x41, 0xf2, 0x7c, 0x42, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 ];
 
 fn named(name: &str) -> Option<Meta> {
@@ -147,6 +163,13 @@ fn one_leaf(scene: Option<Meta>, node: Option<Meta>, mesh: Mesh) -> BreadFile {
 
 fn triangle() -> BreadFile {
     one_leaf(None, None, triangle_mesh([0, 1, 2]))
+}
+
+fn thumbnail() -> BreadFile {
+    BreadFile {
+        thumbnail: Some(THUMBNAIL_PNG.to_vec()),
+        ..triangle()
+    }
 }
 
 fn rotated_triangle() -> BreadFile {
@@ -240,6 +263,7 @@ fn slicer_data() -> BreadFile {
             version: 1,
             document: b"hollows document".to_vec(),
         }],
+        thumbnail: None,
     }
 }
 
@@ -459,15 +483,20 @@ fn document(
     Json::Object(fields)
 }
 
+/// A payload carried without being read: `null`, or its size and SHA-256.
+fn payload(payload: Option<&[u8]>) -> Json {
+    Json::or_null(payload, |payload| {
+        Json::Object(vec![
+            ("size", Json::index(payload.len())),
+            ("sha256", sha256(payload.iter().copied())),
+        ])
+    })
+}
+
 /// The JSON that describes `file`.
 fn describe(description: &str, file: &BreadFile) -> String {
     let scene = &file.scene;
-    let settings = Json::or_null(file.settings.as_deref(), |settings| {
-        Json::Object(vec![
-            ("size", Json::index(settings.len())),
-            ("sha256", sha256(settings.iter().copied())),
-        ])
-    });
+    let settings = payload(file.settings.as_deref());
     let supports = file.supports.iter().map(|entry| {
         let fields = vec![
             ("model", Json::index(entry.model)),
@@ -496,6 +525,7 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ("settings", settings),
         ("supports", Json::List(supports.collect())),
         ("hollows", Json::List(hollows.collect())),
+        ("thumbnail", payload(file.thumbnail.as_deref())),
     ]);
     let mut out = String::new();
     json.write(&mut out, 0);
@@ -584,6 +614,18 @@ fn the_rotated_triangle_is_stored_rotated() {
         }
     }
     panic!("the file has no mesh chunk");
+}
+
+/// Section 8.1 asks for the thumbnail as the first chunk, so a program that
+/// only wants the picture reads one chunk.
+#[test]
+fn the_thumbnail_is_the_first_chunk() {
+    let bytes = std::fs::read(valid_dir().join("thumbnail.bread")).expect("the file exists");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let first = reader.next_chunk().expect("the chunk reads");
+    let first = first.expect("the file has a chunk");
+    assert_eq!(first.tag, THUMBNAIL_TAG);
+    assert_eq!(first.payload, THUMBNAIL_PNG);
 }
 
 /// A file every reader must refuse: its name, what is wrong with it, the
