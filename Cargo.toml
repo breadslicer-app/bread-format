@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/bread-format"]
+members = ["crates/bread-format", "crates/bread-wasm"]
 
 [workspace.package]
 edition    = "2024"
@@ -25,3 +25,13 @@ unused_qualifications         = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
+
+# The WebAssembly module of crates/bread-wasm: small, since browsers download
+# it. Built with `--profile wasm`, so the release profile stays as it is.
+[profile.wasm]
+inherits      = "release"
+opt-level     = "z"
+lto           = true
+codegen-units = 1
+panic         = "abort"
+strip         = true
