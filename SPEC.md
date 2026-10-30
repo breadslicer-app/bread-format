@@ -419,6 +419,7 @@ file](#44-reading-a-file)).
 |---|---|---|---|---|
 | `SCNE` | 1 | exactly one | the scene: its nodes, their transforms, and the meshes they use | [5](#5-scene-scne) |
 | `MESH` | 1 | any number | one triangle mesh | [6](#6-mesh-mesh) |
+| `THMB` | 1 | at most one | a small picture of the file, as a PNG | [8](#8-thumbnail-thmb) |
 | `PROJ` | 1 | at most one | application data: project settings | [7.3](#73-application-chunks) |
 | `SUPP` | 2 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
 | `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
@@ -516,3 +517,44 @@ top of the hollow. A leaf may still show it, for example a solid copy of the sam
 mesh several leaves show is stored once.
 
 A reader that skips `HOLW` sees the hollowed models, as they will print, without their originals.
+
+## 8. Thumbnail (`THMB`)
+
+A thumbnail is a small picture of what the file holds, for programs that show a file without opening
+it, such as a file manager, a shop or a viewer's list of files. It is optional. This section
+describes chunk version 1.
+
+### 8.1 Layout
+
+The payload is a whole PNG file ([PNG specification](https://www.w3.org/TR/png-3/)), with no
+envelope: it starts with the PNG signature `89 50 4E 47 0D 0A 1A 0A`. The PNG header gives the
+picture's width and height, so the chunk does not repeat them.
+
+A writer:
+
+- MUST write a PNG at most 512 pixels wide and 512 pixels high, and SHOULD write one of 256 × 256;
+- SHOULD show the whole scene, as the writer would show it on opening the file, and MAY leave the
+  background transparent;
+- MUST give the colours in sRGB, and SHOULD NOT write PNG chunks that name another colour space;
+- SHOULD write the `THMB` chunk first, right after the header ([4.1](#41-header)), so that a program
+  that only wants the picture reads the first chunk and stops.
+
+The chunk is compressed like any other, though a PNG is already compressed and shrinks little.
+
+### 8.2 Reading it
+
+The thumbnail is a picture of the file, not part of what it holds: the scene and the meshes say
+everything, and a reader that skips `THMB` reads the same file.
+
+- A reader MUST NOT refuse a file because of what its thumbnail holds. A reader that shows the
+  thumbnail SHOULD treat one that is not a PNG it can decode, or that is larger than 512 × 512, as
+  if the file had none.
+- A reader SHOULD check the width and height in the PNG header before it decodes the picture: like a
+  length in the container ([4.5](#45-size-limits)), they can be damaged or enormous.
+
+The rules of the container still hold for the chunk: a reader refuses a file whose `THMB` chunk has
+a CRC that does not match, for example, whether or not it shows the picture
+([4.4](#44-reading-a-file)).
+
+A program that changes the scene or the meshes and writes the file back SHOULD write a new thumbnail,
+or none, so that the picture never shows something the file no longer holds.
