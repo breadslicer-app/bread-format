@@ -45,12 +45,40 @@ Each supports entry has `model` and `support`, the two leaves' node indices; eac
 `model` and `original`, the original's mesh index. Both then have the `generator` name, its document
 `version`, and the document's `document_size` in bytes and its `document_sha256`.
 
+## Invalid files
+
+Every file in [`invalid/`](invalid) is damaged or breaks a rule of the format, and a conforming
+reader MUST refuse it. Each is a valid file with one thing changed, most of them
+[`valid/triangle.bread`](valid/triangle.bread). Beside each `name.bread` is a `name.json`:
+
+| Field | Meaning |
+|---|---|
+| `description` | what is wrong with the file, in a sentence |
+| `reason` | why a reader refuses it: one of the codes below |
+| `chunk` | the tag of the chunk the reason is about, or `null` when it is about the whole file |
+
+A reader passes a file when it refuses it. A reader that tells the reasons apart can also check
+that it gives the expected one:
+
+| `reason` | The reader finds | Section |
+|---|---|---|
+| `not-bread` | fewer than 8 bytes, or 8 bytes that are not the magic | [4.4](../SPEC.md#44-reading-a-file) |
+| `version` | the container, or a chunk it reads, at a version newer than the ones it supports | [3.4](../SPEC.md#34-versions) |
+| `cut-short` | the file ends inside the container version, a chunk header or the stored bytes | [4.4](../SPEC.md#44-reading-a-file) |
+| `crc` | stored bytes that do not match their CRC | [4.3](../SPEC.md#43-stored-bytes-and-checksum) |
+| `bad-payload` | stored bytes that are not a valid frame, or that do not decompress to exactly the raw length | [4.4](../SPEC.md#44-reading-a-file) |
+
+Some files hold a length or a count far larger than what backs it. A reader that allocates for it
+before checking it, as [4.5](../SPEC.md#45-size-limits) forbids, runs out of memory on them
+instead of refusing them.
+
 ## Making the files again
 
 The files are made by the cases in
 [`crates/bread-format/tests/conformance.rs`](../crates/bread-format/tests/conformance.rs). Its tests
-check that the crate still writes the same bytes for each case and reads each file as its JSON says.
-After a change on purpose, the files are made again with:
+check that the crate still writes the same bytes for each case, reads each valid file as its JSON
+says, and refuses each invalid file for its reason. After a change on purpose, the files are made
+again with:
 
 ```text
 cargo test -p bread-format --test conformance -- --ignored
