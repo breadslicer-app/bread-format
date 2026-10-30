@@ -38,9 +38,9 @@ mod tests_mesh;
 mod tests_scene;
 
 pub use app::{
-    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, LeafDocument,
-    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, decode_documents,
-    encode_documents,
+    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, HollowEntry,
+    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, SupportEntry, decode_hollows,
+    decode_supports, encode_hollows, encode_supports,
 };
 pub use container::{BreadReader, BreadWriter, Chunk, ChunkTag, ReadBreadError};
 pub use file::{BreadFile, ReadFileError, WriteFileError, read_file, write_file};

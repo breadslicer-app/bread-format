@@ -8,15 +8,18 @@
 //! scene, in its order.
 //!
 //! Reading skips the chunks this build does not know, official or private,
-//! and writing leaves them out, as section 7.2 allows.
+//! and writing leaves them out, as section 7.2 allows. It also skips supports
+//! and hollows chunks of version 1, which only drafts of the format wrote, as
+//! section 7.3 allows: their models open without editable supports, and their
+//! hollows without the original.
 
 use std::fmt;
 use std::io::{self, Read, Write};
 
 use crate::app::{
-    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, LeafDocument,
-    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, decode_documents,
-    encode_documents,
+    DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, HollowEntry,
+    SETTINGS_TAG, SETTINGS_VERSION, SUPPORTS_TAG, SUPPORTS_VERSION, SupportEntry, decode_hollows,
+    decode_supports, encode_hollows, encode_supports,
 };
 use crate::container::{BreadReader, BreadWriter, ChunkTag, ReadBreadError};
 use crate::mesh::{
@@ -33,10 +36,10 @@ pub struct BreadFile {
     pub scene: Scene,
     /// The project settings document, carried without being read.
     pub settings: Option<Vec<u8>>,
-    /// Supports kept as data. Their leaves show an empty mesh.
-    pub supports: Vec<LeafDocument>,
-    /// How hollowed models were made. Their leaves keep the hollow.
-    pub hollows: Vec<LeafDocument>,
+    /// Supports kept as data. Their support leaves show an empty mesh.
+    pub supports: Vec<SupportEntry>,
+    /// How hollowed models were made. Their leaves show the hollow.
+    pub hollows: Vec<HollowEntry>,
 }
 
 /// Why a file could not be written.
@@ -50,6 +53,10 @@ pub enum WriteFileError {
     /// A support leaf shows a mesh with vertices or triangles: support
     /// leaves are stored with an empty mesh.
     SupportMeshNotEmpty {
+        leaf: usize,
+    },
+    /// A support leaf is also a hollowed model.
+    SupportIsHollowed {
         leaf: usize,
     },
 }
@@ -67,6 +74,7 @@ impl fmt::Display for WriteFileError {
                     "the support leaf {leaf} shows a mesh instead of an empty one"
                 )
             }
+            Self::SupportIsHollowed { leaf } => write!(f, "{}", SupportIsHollowed(*leaf)),
         }
     }
 }
@@ -99,6 +107,10 @@ pub enum ReadFileError {
     Scene(DecodeSceneError),
     Supports(DecodeDocumentsError),
     Hollows(DecodeDocumentsError),
+    /// A support leaf is also a hollowed model.
+    SupportIsHollowed {
+        leaf: usize,
+    },
 }
 
 impl fmt::Display for ReadFileError {
@@ -118,11 +130,21 @@ impl fmt::Display for ReadFileError {
             Self::Mesh(err) => write!(f, "{err}"),
             Self::Scene(err) => write!(f, "{err}"),
             Self::Supports(err) | Self::Hollows(err) => write!(f, "{err}"),
+            Self::SupportIsHollowed { leaf } => write!(f, "{}", SupportIsHollowed(*leaf)),
         }
     }
 }
 
 impl std::error::Error for ReadFileError {}
+
+/// The message of both `SupportIsHollowed` errors.
+struct SupportIsHollowed(usize);
+
+impl fmt::Display for SupportIsHollowed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the support leaf {} is also a hollowed model", self.0)
+    }
+}
 
 impl From<ReadBreadError> for ReadFileError {
     fn from(err: ReadBreadError) -> Self {
@@ -134,17 +156,21 @@ impl From<ReadBreadError> for ReadFileError {
 /// fails, what it wrote to `out` is not a valid file.
 pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileError> {
     let scene = &file.scene;
-    for support in &file.supports {
+    let scene_payload = encode_scene(scene).map_err(WriteFileError::Scene)?;
+    let supports = encode_supports(&file.supports, scene).map_err(WriteFileError::Supports)?;
+    let hollows = encode_hollows(&file.hollows, scene).map_err(WriteFileError::Hollows)?;
+    for entry in &file.supports {
+        let leaf = entry.support;
         if scene
-            .leaf_mesh(support.leaf)
+            .leaf_mesh(leaf)
             .is_some_and(|mesh| !mesh.vertices.is_empty() || !mesh.triangles.is_empty())
         {
-            return Err(WriteFileError::SupportMeshNotEmpty { leaf: support.leaf });
+            return Err(WriteFileError::SupportMeshNotEmpty { leaf });
         }
     }
-    let scene_payload = encode_scene(scene).map_err(WriteFileError::Scene)?;
-    let supports = encode_documents(&file.supports, scene).map_err(WriteFileError::Supports)?;
-    let hollows = encode_documents(&file.hollows, scene).map_err(WriteFileError::Hollows)?;
+    if let Some(leaf) = hollowed_support(&file.supports, &file.hollows) {
+        return Err(WriteFileError::SupportIsHollowed { leaf });
+    }
 
     let mut writer = BreadWriter::new(out)?;
     writer.chunk(SCENE_TAG, SCENE_VERSION, &scene_payload)?;
@@ -185,11 +211,14 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
                 version: chunk.version,
             });
         }
+        // An older supports or hollows chunk is a draft one: it still counts
+        // as the one chunk of its tag, but its payload is not read.
+        let current = chunk.version == supported;
         match chunk.tag {
             SCENE_TAG => scenes.push(chunk.payload),
             SETTINGS_TAG => settings.push(chunk.payload),
-            SUPPORTS_TAG => supports.push(chunk.payload),
-            HOLLOWS_TAG => hollows.push(chunk.payload),
+            SUPPORTS_TAG => supports.push(current.then_some(chunk.payload)),
+            HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
             _ => meshes.push(decode_mesh(&chunk.payload).map_err(ReadFileError::Mesh)?),
         }
     }
@@ -198,18 +227,21 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         count: 0,
     })?;
     let settings = single(SETTINGS_TAG, settings)?;
-    let supports = single(SUPPORTS_TAG, supports)?;
-    let hollows = single(HOLLOWS_TAG, hollows)?;
+    let supports = single(SUPPORTS_TAG, supports)?.flatten();
+    let hollows = single(HOLLOWS_TAG, hollows)?.flatten();
 
     let scene = decode_scene(&scene, meshes).map_err(ReadFileError::Scene)?;
     let supports = match supports {
         None => Vec::new(),
-        Some(payload) => decode_documents(&payload, &scene).map_err(ReadFileError::Supports)?,
+        Some(payload) => decode_supports(&payload, &scene).map_err(ReadFileError::Supports)?,
     };
     let hollows = match hollows {
         None => Vec::new(),
-        Some(payload) => decode_documents(&payload, &scene).map_err(ReadFileError::Hollows)?,
+        Some(payload) => decode_hollows(&payload, &scene).map_err(ReadFileError::Hollows)?,
     };
+    if let Some(leaf) = hollowed_support(&supports, &hollows) {
+        return Err(ReadFileError::SupportIsHollowed { leaf });
+    }
     Ok(BreadFile {
         scene,
         settings,
@@ -218,8 +250,17 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     })
 }
 
-/// The payload of a chunk that comes at most once.
-fn single(tag: ChunkTag, chunks: Vec<Vec<u8>>) -> Result<Option<Vec<u8>>, ReadFileError> {
+/// A support leaf that is also the model of a hollow, which section 7.3
+/// forbids across the two chunks.
+fn hollowed_support(supports: &[SupportEntry], hollows: &[HollowEntry]) -> Option<usize> {
+    supports
+        .iter()
+        .map(|entry| entry.support)
+        .find(|&leaf| hollows.iter().any(|hollow| hollow.model == leaf))
+}
+
+/// The chunk of a tag that comes at most once.
+fn single<T>(tag: ChunkTag, chunks: Vec<T>) -> Result<Option<T>, ReadFileError> {
     if chunks.len() > 1 {
         return Err(ReadFileError::ChunkCount {
             tag,
