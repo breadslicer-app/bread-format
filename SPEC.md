@@ -423,6 +423,7 @@ file](#44-reading-a-file)).
 | `PROJ` | 1 | at most one | application data: project settings | [7.3](#73-application-chunks) |
 | `SUPP` | 2 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
 | `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
+| `SPRV` | 1 | at most one | a preview of the supports, for readers that skip `SUPP` | [9](#9-support-preview-sprv) |
 
 *Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
 that holds a different number of chunks of that tag than *Per file* allows.
@@ -502,7 +503,7 @@ support leaf is stored with an empty mesh, one with no vertices and no triangles
 that wrote the document rebuilds the mesh from it, so the supports stay editable.
 
 A reader that skips `SUPP` sees the support leaves with no mesh: it shows the models without their
-supports. This document does not yet give such readers a preview of the supports.
+supports, unless the file has a support preview ([9](#9-support-preview-sprv)).
 
 #### `HOLW`: hollowed models
 
@@ -558,3 +559,58 @@ a CRC that does not match, for example, whether or not it shows the picture
 
 A program that changes the scene or the meshes and writes the file back SHOULD write a new thumbnail,
 or none, so that the picture never shows something the file no longer holds.
+
+## 9. Support preview (`SPRV`)
+
+Supports are kept as data ([`SUPP`](#supp-supports)): their leaves are stored with an empty mesh,
+and only the program that wrote the document can rebuild it. A support preview is the mesh of those
+supports as they were when the file was written, so that any reader can show them, such as a viewer
+or a shop. It is optional. This section describes chunk version 1.
+
+The preview has a chunk of its own, rather than being a mesh of the scene, so that the scene and the
+numbering of its meshes are the same with or without it, and a program that drops the chunk leaves
+no mesh behind.
+
+### 9.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| previews | count | how many previews follow |
+| leaf | `u32` | the node index of the support leaf in the scene chunk ([5](#5-scene-scne)) |
+| mesh | byte string | the mesh of the supports: the payload of a `MESH` chunk of version 1 ([6.2](#62-layout)) |
+
+The last two fields repeat for every preview, so each preview takes at least 8 bytes. The mesh is in
+the leaf's own space, like a mesh the leaf would show, and it is kept as exactly as any other mesh
+([6.1](#61-what-is-kept)). A new version of the `MESH` layout will come with a new version of this
+chunk.
+
+A writer:
+
+- MUST name, in each preview, the support leaf of an entry of the file's `SUPP` chunk, and MUST NOT
+  write two previews of the same leaf. It MAY leave some support leaves without a preview.
+- SHOULD write the mesh that the program that wrote the supports document rebuilds from it.
+
+### 9.2 Reading it
+
+A reader that shows the preview shows each preview's mesh where its leaf would show its own mesh:
+with the leaf's world transform, every time the walk of [5.4](#54-placing-the-meshes) reaches the
+leaf.
+
+A reader that reads `SPRV`:
+
+- MUST refuse the chunk as malformed if a mesh is not a valid `MESH` payload of version 1, checked
+  as a `MESH` chunk is ([6](#6-mesh-mesh));
+- MUST refuse the file if a preview names no node of the scene, a node that is not a leaf, or a leaf
+  whose mesh has vertices or triangles, or if two previews name the same leaf;
+- MUST refuse the file, if it also reads `SUPP`, when a preview names a leaf that is not the support
+  leaf of an entry there.
+
+The preview is for showing, not for editing. A program that rebuilds the supports from their
+document SHOULD ignore the preview, so that what it shows and edits always comes from the document.
+
+A reader that skips `SPRV` reads the same file: the support leaves show no mesh, as
+[`SUPP`](#supp-supports) says.
+
+A program that changes the supports, or the models they stand on, and writes the file back SHOULD
+write a new preview, or none, so that the preview never shows supports the file no longer holds. A
+program that drops the `SUPP` chunk MUST drop the preview with it.
