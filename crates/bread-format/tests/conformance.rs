@@ -3,13 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-//! The conformance files in `conformance/valid/` at the root of the
-//! repository: small `.bread` files every reader must open, each with a JSON
-//! file beside it that describes what it holds (see the README there).
+//! The conformance files in `conformance/` at the root of the repository
+//! (see the README there): in `valid/`, small `.bread` files every reader must
+//! open, each with a JSON file beside it that describes what it holds; in
+//! `invalid/`, files every reader must refuse, each with a JSON file that
+//! gives the reason.
 //!
 //! The cases below make the files. `the_files_match_their_cases` checks that
-//! writing each case still gives the stored bytes, so a change to them is
-//! seen, and that reading the stored file gives its JSON. After a change on
+//! writing each valid case still gives the stored bytes, so a change to them
+//! is seen, and that reading the stored file gives its JSON;
+//! `the_invalid_files_match_their_cases` checks the same of the invalid cases,
+//! and that the crate refuses each file for its reason. After a change on
 //! purpose, the files are made again with:
 //!
 //! ```text
@@ -17,11 +21,12 @@
 //! ```
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, HollowEntry, MESH_TAG, Mesh, Meta, Node,
-    NodeKind, Scene, SupportEntry, Transform, read_file, write_file,
+    NodeKind, ReadBreadError, ReadFileError, SCENE_TAG, Scene, SupportEntry, Transform, read_file,
+    write_file,
 };
 use sha2::{Digest, Sha256};
 
@@ -581,25 +586,295 @@ fn the_rotated_triangle_is_stored_rotated() {
     panic!("the file has no mesh chunk");
 }
 
+/// A file every reader must refuse: its name, what is wrong with it, the
+/// reason a reader gives, and the chunk the reason is about, if any.
+struct Invalid {
+    name: &'static str,
+    description: &'static str,
+    reason: &'static str,
+    chunk: Option<ChunkTag>,
+    bytes: fn() -> Vec<u8>,
+}
+
+const INVALID: &[Invalid] = &[
+    Invalid {
+        name: "wrong-magic",
+        description: "The triangle file with its magic spelled `bread` instead of `BREAD`.",
+        reason: "not-bread",
+        chunk: None,
+        bytes: wrong_magic,
+    },
+    Invalid {
+        name: "text-mode-magic",
+        description: "The triangle file after a text-mode transfer turned every CR LF into LF, \
+                      which changes the magic.",
+        reason: "not-bread",
+        chunk: None,
+        bytes: text_mode_magic,
+    },
+    Invalid {
+        name: "newer-container",
+        description: "The triangle file with container version 2.",
+        reason: "version",
+        chunk: None,
+        bytes: newer_container,
+    },
+    Invalid {
+        name: "cut-short",
+        description: "The triangle file with its last byte cut off, inside the stored bytes of \
+                      the mesh chunk.",
+        reason: "cut-short",
+        chunk: None,
+        bytes: cut_short,
+    },
+    Invalid {
+        name: "crc-mismatch",
+        description: "The triangle file with one bit flipped in the stored bytes of the mesh \
+                      chunk, so they no longer match its CRC.",
+        reason: "crc",
+        chunk: Some(MESH_TAG),
+        bytes: crc_mismatch,
+    },
+    Invalid {
+        name: "wrong-raw-length",
+        description: "The triangle file with the raw length of the scene chunk one byte more \
+                      than its payload decompresses to.",
+        reason: "bad-payload",
+        chunk: Some(SCENE_TAG),
+        bytes: wrong_raw_length,
+    },
+    Invalid {
+        name: "huge-raw-length",
+        description: "The triangle file with the raw length of the mesh chunk set to 2^63: a \
+                      reader that allocates it up front asks for 8 EiB.",
+        reason: "bad-payload",
+        chunk: Some(MESH_TAG),
+        bytes: huge_raw_length,
+    },
+    Invalid {
+        name: "newer-chunk",
+        description: "The triangle file with its mesh chunk at version 2, which this version of \
+                      the format does not describe.",
+        reason: "version",
+        chunk: Some(MESH_TAG),
+        bytes: newer_chunk,
+    },
+];
+
+/// A file taken apart field by field, to be damaged on purpose.
+struct RawFile {
+    magic: [u8; 8],
+    version: u16,
+    chunks: Vec<RawChunk>,
+}
+
+/// A chunk as stored: its header fields and stored bytes. The stored length
+/// is that of `stored`.
+struct RawChunk {
+    tag: ChunkTag,
+    version: u16,
+    raw_len: u64,
+    crc: u32,
+    stored: Vec<u8>,
+}
+
+impl RawFile {
+    /// The valid triangle file, taken apart: a scene chunk, then a mesh
+    /// chunk.
+    fn triangle() -> Self {
+        let bytes = write_file(&triangle(), Vec::new()).expect("the triangle writes");
+        Self::parse(&bytes)
+    }
+
+    fn parse(bytes: &[u8]) -> Self {
+        let (header, mut rest) = bytes.split_at(10);
+        let mut chunks = Vec::new();
+        while !rest.is_empty() {
+            let (head, tail) = rest.split_at(26);
+            let stored_len = u64::from_le_bytes(head[14..22].try_into().unwrap());
+            let (stored, tail) = tail.split_at(usize::try_from(stored_len).unwrap());
+            chunks.push(RawChunk {
+                tag: ChunkTag(head[..4].try_into().unwrap()),
+                version: u16::from_le_bytes(head[4..6].try_into().unwrap()),
+                raw_len: u64::from_le_bytes(head[6..14].try_into().unwrap()),
+                crc: u32::from_le_bytes(head[22..].try_into().unwrap()),
+                stored: stored.to_vec(),
+            });
+            rest = tail;
+        }
+        Self {
+            magic: header[..8].try_into().unwrap(),
+            version: u16::from_le_bytes(header[8..].try_into().unwrap()),
+            chunks,
+        }
+    }
+
+    fn chunk(&mut self, tag: ChunkTag) -> &mut RawChunk {
+        let chunk = self.chunks.iter_mut().find(|chunk| chunk.tag == tag);
+        chunk.expect("the file has the chunk")
+    }
+
+    fn bytes(&self) -> Vec<u8> {
+        let mut out = self.magic.to_vec();
+        out.extend(self.version.to_le_bytes());
+        for chunk in &self.chunks {
+            out.extend(chunk.tag.0);
+            out.extend(chunk.version.to_le_bytes());
+            out.extend(chunk.raw_len.to_le_bytes());
+            out.extend((chunk.stored.len() as u64).to_le_bytes());
+            out.extend(chunk.crc.to_le_bytes());
+            out.extend(&chunk.stored);
+        }
+        out
+    }
+}
+
+fn wrong_magic() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.magic[..5].copy_from_slice(b"bread");
+    file.bytes()
+}
+
+fn text_mode_magic() -> Vec<u8> {
+    let bytes = RawFile::triangle().bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    for (i, &byte) in bytes.iter().enumerate() {
+        if !(byte == b'\r' && bytes.get(i + 1) == Some(&b'\n')) {
+            out.push(byte);
+        }
+    }
+    out
+}
+
+fn newer_container() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.version = 2;
+    file.bytes()
+}
+
+fn cut_short() -> Vec<u8> {
+    let mut bytes = RawFile::triangle().bytes();
+    bytes.pop();
+    bytes
+}
+
+fn crc_mismatch() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    let stored = &mut file.chunk(MESH_TAG).stored;
+    *stored.last_mut().expect("the chunk stores bytes") ^= 1;
+    file.bytes()
+}
+
+fn wrong_raw_length() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.chunk(SCENE_TAG).raw_len += 1;
+    file.bytes()
+}
+
+fn huge_raw_length() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.chunk(MESH_TAG).raw_len = 1 << 63;
+    file.bytes()
+}
+
+fn newer_chunk() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.chunk(MESH_TAG).version = 2;
+    file.bytes()
+}
+
+/// The reason code of `err`, and the chunk it is about, as the README names
+/// them.
+fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
+    match err {
+        ReadFileError::File(ReadBreadError::NotBread) => ("not-bread", None),
+        ReadFileError::File(ReadBreadError::UnsupportedVersion(_)) => ("version", None),
+        ReadFileError::File(ReadBreadError::Truncated) => ("cut-short", None),
+        ReadFileError::File(ReadBreadError::Corrupt(tag)) => ("crc", Some(*tag)),
+        ReadFileError::File(ReadBreadError::BadPayload(tag)) => ("bad-payload", Some(*tag)),
+        ReadFileError::ChunkVersion { tag, .. } => ("version", Some(*tag)),
+        other => panic!("no conformance file expects this error: {other}"),
+    }
+}
+
+/// The JSON that gives the reason of an invalid case.
+fn describe_invalid(case: &Invalid) -> String {
+    let json = Json::Object(vec![
+        ("description", Json::text(case.description)),
+        ("reason", Json::text(case.reason)),
+        (
+            "chunk",
+            Json::or_null(case.chunk, |tag| Json::Text(tag.to_string())),
+        ),
+    ]);
+    let mut out = String::new();
+    json.write(&mut out, 0);
+    out.push('\n');
+    out
+}
+
+fn invalid_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance/invalid")
+}
+
 #[test]
-fn every_file_has_a_case() {
-    let mut names: Vec<String> = std::fs::read_dir(valid_dir())
+fn the_invalid_files_match_their_cases() {
+    let dir = invalid_dir();
+    for case in INVALID {
+        let stored = std::fs::read(dir.join(format!("{}.bread", case.name)))
+            .unwrap_or_else(|err| panic!("{}.bread: {err}", case.name));
+        assert!(
+            stored == (case.bytes)(),
+            "{}.bread is not what the case writes",
+            case.name
+        );
+
+        let Err(err) = read_file(stored.as_slice()) else {
+            panic!("{}.bread is read", case.name);
+        };
+        assert_eq!(
+            reason(&err),
+            (case.reason, case.chunk),
+            "{}.bread is refused as: {err}",
+            case.name
+        );
+
+        let json = std::fs::read_to_string(dir.join(format!("{}.json", case.name)))
+            .unwrap_or_else(|err| panic!("{}.json: {err}", case.name));
+        assert_eq!(json, describe_invalid(case), "{}.json", case.name);
+    }
+}
+
+/// The names of the files in `dir`, sorted.
+fn file_names(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
         .expect("the folder reads")
         .map(|entry| entry.expect("the entry reads").file_name())
         .map(|name| name.into_string().expect("the name is UTF-8"))
         .collect();
     names.sort();
-    let mut expected: Vec<String> = CASES
-        .iter()
-        .flat_map(|case| {
-            [
-                format!("{}.bread", case.name),
-                format!("{}.json", case.name),
-            ]
-        })
+    names
+}
+
+/// `name.bread` and `name.json` for each name, sorted.
+fn case_files<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut files: Vec<String> = names
+        .flat_map(|name| [format!("{name}.bread"), format!("{name}.json")])
         .collect();
-    expected.sort();
-    assert_eq!(names, expected);
+    files.sort();
+    files
+}
+
+#[test]
+fn every_file_has_a_case() {
+    assert_eq!(
+        file_names(&valid_dir()),
+        case_files(CASES.iter().map(|case| case.name))
+    );
+    assert_eq!(
+        file_names(&invalid_dir()),
+        case_files(INVALID.iter().map(|case| case.name))
+    );
 }
 
 #[test]
@@ -609,6 +884,15 @@ fn regenerate() {
     std::fs::create_dir_all(&dir).expect("the folder is made");
     for case in CASES {
         let (bytes, json) = generate(case);
+        std::fs::write(dir.join(format!("{}.bread", case.name)), bytes).expect("the file writes");
+        std::fs::write(dir.join(format!("{}.json", case.name)), json).expect("the JSON writes");
+    }
+
+    let dir = invalid_dir();
+    std::fs::create_dir_all(&dir).expect("the folder is made");
+    for case in INVALID {
+        let bytes = (case.bytes)();
+        let json = describe_invalid(case);
         std::fs::write(dir.join(format!("{}.bread", case.name)), bytes).expect("the file writes");
         std::fs::write(dir.join(format!("{}.json", case.name)), json).expect("the JSON writes");
     }
