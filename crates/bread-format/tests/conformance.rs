@@ -102,7 +102,8 @@ const CASES: &[Case] = &[
     },
     Case {
         name: "thumbnail",
-        description: "The triangle file with a thumbnail, written as the first chunk: a PNG of                       2 x 2 pixels, three of them opaque and one transparent.",
+        description: "The triangle file with a thumbnail, written as the first chunk: a PNG of \
+                      2 x 2 pixels, three of them opaque and one transparent.",
         file: thumbnail,
         skipped: &[],
     },
@@ -1109,6 +1110,20 @@ fn case_files<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
         .collect();
     files.sort();
     files
+}
+
+/// A description is one sentence, with single spaces: a line of it broken
+/// without a trailing `\` would carry the next line's indentation.
+#[test]
+fn descriptions_have_single_spaces() {
+    let valid = CASES.iter().map(|case| (case.name, case.description));
+    let invalid = INVALID.iter().map(|case| (case.name, case.description));
+    for (name, description) in valid.chain(invalid) {
+        assert!(
+            !description.contains("  ") && description.trim() == description,
+            "{name}: {description:?}"
+        );
+    }
 }
 
 #[test]

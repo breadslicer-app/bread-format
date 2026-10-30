@@ -1,5 +1,5 @@
 {
-  "description": "The triangle file with a thumbnail, written as the first chunk: a PNG of                       2 x 2 pixels, three of them opaque and one transparent.",
+  "description": "The triangle file with a thumbnail, written as the first chunk: a PNG of 2 x 2 pixels, three of them opaque and one transparent.",
   "meta": null,
   "meshes": [
     {
