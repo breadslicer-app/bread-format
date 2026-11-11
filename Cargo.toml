@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/bread-format", "crates/bread-wasm"]
+members = ["crates/bread-format", "crates/bread-wasm", "tools/corpus-bench"]
 
 [workspace.package]
 edition    = "2024"
