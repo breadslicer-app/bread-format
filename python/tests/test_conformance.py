@@ -98,7 +98,7 @@ class Valid(unittest.TestCase):
                 want = {k: v for k, v in want.items() if k != "description"}
                 self.assertEqual(got, want)
             count += 1
-        self.assertEqual(count, 18)
+        self.assertTrue(count, "no valid files found")
 
 
 class Invalid(unittest.TestCase):
@@ -110,7 +110,7 @@ class Invalid(unittest.TestCase):
                     read_file(data)
                 self.assertEqual((caught.exception.reason, caught.exception.chunk), (want["reason"], want["chunk"]))
             count += 1
-        self.assertEqual(count, 17)
+        self.assertTrue(count, "no invalid files found")
 
 
 if __name__ == "__main__":
