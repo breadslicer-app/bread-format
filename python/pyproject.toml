@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 SynrgStudio
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bread-format"
+version = "0.1.0"
+description = "Reads .bread files: triangle meshes kept bit for bit, and the scene that places them."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = []
+keywords = ["3d", "mesh", "stl", "3d-printing", "file-format"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+
+[project.urls]
+Homepage = "https://bread.synrgs.tech"
+
+[tool.setuptools.packages.find]
+where = ["src"]
