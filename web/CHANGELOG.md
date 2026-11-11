@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-11-11, a key for the 1.97 M mesh
+
+- New fact `js_mesh_triangles` (1,967,357): the mesh the JavaScript times and the second reader's
+  time use. Until now it only lived in the `what` of `open_js_v2_ms` and `second_reader_open_v2_s`.
+
 ## 2026-11-11, later
 
 - `conformance_invalid` is 18: a reader now also refuses container version 0.
