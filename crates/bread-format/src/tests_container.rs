@@ -96,3 +96,42 @@ fn a_wrong_recorded_length_is_a_bad_payload() {
     bytes[16..24].copy_from_slice(&(1u64 << 40).to_le_bytes());
     assert!(matches!(read_all(&bytes), Err(ReadBreadError::BadPayload(tag)) if tag == A));
 }
+
+/// A file of one chunk `A` whose stored bytes are `stored`, as they are.
+fn with_stored(raw_len: u64, stored: &[u8]) -> Vec<u8> {
+    let mut bytes = file(&[]);
+    bytes.extend_from_slice(&A.0);
+    bytes.extend_from_slice(&1u16.to_le_bytes());
+    bytes.extend_from_slice(&raw_len.to_le_bytes());
+    bytes.extend_from_slice(&(stored.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(&crc32fast::hash(stored).to_le_bytes());
+    bytes.extend_from_slice(stored);
+    bytes
+}
+
+#[test]
+fn stored_bytes_are_exactly_one_frame() {
+    let one = zstd::bulk::compress(b"half", 3).unwrap();
+    assert_eq!(read_all(&with_stored(4, &one)).unwrap()[0].2, b"half");
+
+    // Two frames in a row decompress to the payload, but are not one frame.
+    let two = [one.clone(), one.clone()].concat();
+    assert!(matches!(
+        read_all(&with_stored(8, &two)),
+        Err(ReadBreadError::BadPayload(tag)) if tag == A
+    ));
+    // Nor is a frame followed by other bytes, or by a skippable frame.
+    let skippable = [0x50, 0x2a, 0x4d, 0x18, 1, 0, 0, 0, 0];
+    for tail in [&[0u8][..], &skippable] {
+        let stored = [&one[..], tail].concat();
+        assert!(matches!(
+            read_all(&with_stored(4, &stored)),
+            Err(ReadBreadError::BadPayload(tag)) if tag == A
+        ));
+    }
+    // A skippable frame alone holds no payload: it is not one either.
+    assert!(matches!(
+        read_all(&with_stored(0, &skippable)),
+        Err(ReadBreadError::BadPayload(tag)) if tag == A
+    ));
+}

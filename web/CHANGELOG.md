@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-11-11, one Zstandard frame
+
+- `conformance_invalid` is 19: a reader now also refuses a chunk stored as two Zstandard frames in
+  a row (`invalid/two-frames`).
+
 ## 2026-11-11, a public corpus
 
 - **MZ4250's miniatures:** 2,288 models under CC BY 4.0, all measured with the reference

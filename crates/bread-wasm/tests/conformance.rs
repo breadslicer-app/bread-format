@@ -99,7 +99,7 @@ fn the_container_cases_are_refused_for_their_reason() {
             assert!(result.is_ok(), "{name} is for the chunk readers to refuse");
         }
     }
-    assert_eq!(refused, 9, "the container cases");
+    assert_eq!(refused, 10, "the container cases");
 }
 
 /// Copies `bytes` in and reads them, as JavaScript does.

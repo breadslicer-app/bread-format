@@ -21,6 +21,9 @@ _CHUNK_HEADER = struct.Struct("<4sHQQI")  # tag, version, raw, stored, CRC: 26 b
 # holds, never with the raw length it claims (SPEC 4.5).
 _STEP = 1 << 20
 
+# The first four bytes of a Zstandard frame that holds data (RFC 8878, 3.1.1).
+_ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
+
 
 @dataclass(frozen=True)
 class RawChunk:
@@ -73,6 +76,9 @@ def decompress(chunk: RawChunk) -> bytes:
     """The chunk's payload: one Zstandard frame that decompresses to exactly
     the raw length (SPEC 4.3), decompressed as a stream that stops as soon as
     it passes the raw length (SPEC 4.5)."""
+    if bytes(chunk.stored[:4]) != _ZSTD_MAGIC:
+        # A skippable frame is a valid frame that holds no payload.
+        raise BreadError("bad-payload", chunk.name)
     decompressor = zstd.ZstdDecompressor()
     out = bytearray()
     data = bytes(chunk.stored)
