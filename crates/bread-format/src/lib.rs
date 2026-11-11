@@ -26,6 +26,7 @@ pub mod file;
 pub mod mesh;
 pub mod mesh_v2;
 mod meta;
+mod parallel;
 pub mod preview;
 pub mod scene;
 pub mod surface;

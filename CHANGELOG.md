@@ -4,6 +4,19 @@ What changes in each release of the `bread-format` crate. The format itself is d
 [SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
 read files of an older release differently, and each release says how.
 
+## Unreleased
+
+- **Container version 0 is refused** (`SPEC.md`, section 3.4), as a chunk at version 0 already was:
+  versions start at 1. No file written by this crate has it.
+- **Faster writing and reading, same bytes.** Meshes are encoded and decoded side by side on the
+  machine's threads, and so are the independent steps inside one `MESH` v2 mesh: finding
+  connectivity B's order, trying the three vertex codings, and decoding the triangles beside the
+  vertex parts. `write_file` writes exactly the bytes it wrote before. A file refused by
+  `read_file` is refused for the same reason as before: the first fault in file order. On 15 real
+  Breadslicer projects, writing takes 18–58 % less time and reading up to 50 % less. A single
+  scattered mesh of 1.9 M triangles writes in 1.12 s instead of 1.45 s. On WebAssembly everything
+  stays on one thread, as before.
+
 ## 0.2.0 (2026-11-11)
 
 For use as a git dependency by tag, like 0.1.0. **Reading files of 0.1.0:** they open as before,
