@@ -16,8 +16,8 @@
 //! guarded by a CRC-32. [`container`] reads and writes chunks without knowing
 //! what they hold; [`scene`] and [`mesh`] are the codecs of the scene chunk
 //! and of the mesh chunks it places, [`app`] carries the documents of the
-//! application chunks, and [`preview`] the meshes that show supports to
-//! readers that do not rebuild them.
+//! application chunks, [`preview`] the meshes that show supports to readers
+//! that do not rebuild them, and [`surface`] the paint on the faces of models.
 
 pub mod app;
 mod bytes;
@@ -27,6 +27,7 @@ pub mod mesh;
 mod meta;
 pub mod preview;
 pub mod scene;
+pub mod surface;
 
 #[cfg(test)]
 mod tests_app;
@@ -40,6 +41,8 @@ mod tests_mesh;
 mod tests_preview;
 #[cfg(test)]
 mod tests_scene;
+#[cfg(test)]
+mod tests_surface;
 
 pub use app::{
     DecodeDocumentsError, EncodeDocumentsError, HOLLOWS_TAG, HOLLOWS_VERSION, HollowEntry,
@@ -62,4 +65,8 @@ pub use preview::{
 pub use scene::{
     DecodeSceneError, EncodeSceneError, Node, NodeKind, SCENE_TAG, SCENE_VERSION, Scene, Transform,
     decode_scene, encode_scene,
+};
+pub use surface::{
+    DecodeSurfaceError, EncodeSurfaceError, SURFACE_TAG, SURFACE_VERSION, SurfaceEntry,
+    decode_surface, encode_surface,
 };

@@ -22,6 +22,7 @@ what it reads matches the JSON.
 | `hollows` | the `HOLW` entries, in order (below) |
 | `thumbnail` | the `THMB` payload, a PNG: `null` when there is none, or its `size` in bytes and its `sha256` |
 | `support_previews` | the `SPRV` previews, in order: each has `leaf`, the support leaf's node index, and `mesh`, as for the meshes |
+| `surface` | the `SURF` entries, in order: each has `leaf`, `kind`, the document `version`, and the document's `document_size` and `document_sha256` |
 
 Each mesh:
 

@@ -17,6 +17,11 @@ read files of an older release differently, and each release says how.
   checked when reading and when writing. A file whose supports chunk is a draft (version 1) opens
   without its previews. `BreadFile` has a new field, so code that builds one with every field named
   needs `support_previews: Vec::new()`.
+- **Surface paint** (`SPEC.md`, section 10): `BreadFile::surface` carries the `SURF` chunk, paint on
+  the faces of leaves, as `SurfaceEntry { leaf, kind, version, document }`. Only the envelope is
+  checked (each entry names a leaf, no two share a leaf and a kind); documents are carried without
+  being read. `write_file` writes it after the hollows and before the mesh chunks. `BreadFile` has a
+  new field, so code that builds one with every field named needs `surface: Vec::new()`.
 - **`supported_version(tag)`**: the newest version of a chunk this build reads, or `None` for a tag
   it does not know and skips. `read_file` uses it, so other readers built on `BreadReader`, such as
   the JavaScript binding, check chunk versions the same way.
