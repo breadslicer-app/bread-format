@@ -35,3 +35,18 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo +stable clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo +stable test --workspace --all-features
+
+  # The second reader, written from SPEC.md alone, against the conformance
+  # files. Plain Python with no dependencies, so Linux is enough.
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: python -m unittest discover -s tests -v
+        working-directory: python
+        env:
+          PYTHONPATH: src
