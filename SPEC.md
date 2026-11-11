@@ -303,7 +303,8 @@ round to `f32`, if it needs to, only at the end.
 ## 6. Mesh (`MESH`)
 
 A `MESH` chunk holds one triangle mesh: its vertex positions, and triangles that name them. The
-scene names meshes by the order of their `MESH` chunks. This section describes chunk version 1.
+scene names meshes by the order of their `MESH` chunks. Sections 6.2 to 6.5 describe chunk
+version 1, and sections 6.6 to 6.9 version 2.
 
 ### 6.1 What is kept
 
@@ -400,6 +401,76 @@ modulo 3. So corner 1 turns (c, a, b) back into (a, b, c), and corner 2 does the
 - A reader MUST refuse as malformed a rotation that names a triangle past the last one, a corner
   other than `1` or `2`, or a gap of 0 after the first rotation.
 
+### 6.6 Version 2
+
+Version 2 keeps the same mesh as version 1 ([6.1](#61-what-is-kept)), in fewer bytes. Triangles
+can be stored in an order the triangle codec compresses better, with the way back to their own
+order. Vertices can be predicted from the triangles around them, so that only the difference is
+stored. Writers SHOULD write version 2. A reader that reads `MESH` MUST read both versions.
+
+| Field | Type | Meaning |
+|---|---|---|
+| metadata | metadata | the mesh's name and comment, as in version 1 ([6.2](#62-layout)) |
+| vertex count | `u32` | how many vertices the mesh has |
+| triangle count | `u32` | how many triangles the mesh has |
+| connectivity | `u8` | how the triangles are stored: `0` A, in their own order; `1` B, reordered ([6.7](#67-version-2-triangles)) |
+| vertex coding | `u8` | how the vertices are stored: `0` meshopt, `1` prediction + rANS, `2` prediction + byte planes ([6.9](#69-version-2-vertex-codings)) |
+| parts | byte strings | the parts the connectivity and the coding name, in this order |
+
+The parts are:
+
+1. the **index buffer** ([6.7](#67-version-2-triangles));
+2. with connectivity B only, the **permutation**;
+3. the **corners**;
+4. the vertex parts: one for codings `0` and `2`, three for coding `1` (tables, stream, raw bits)
+   ([6.9](#69-version-2-vertex-codings)).
+
+Nothing follows the last part. A reader MUST refuse as malformed a connectivity other than `0` or
+`1`, and a vertex coding other than `0`, `1` or `2`.
+
+Some parts are **bit streams**: values packed least significant bit first, each value's bits going
+to the lowest bits not yet used, filling one byte before the next. A bit stream is exactly as long
+as its bits need, and the unused bits of its last byte are 0. A reader MUST refuse as malformed a
+bit stream of any other length, or whose unused bits are not 0.
+
+### 6.7 Version 2 triangles
+
+The **decoding order** is the order the triangles are stored in: their own order with
+connectivity A, the codec's order with connectivity B. Vertices are numbered for decoding as the
+connectivity says, and the vertex parts store them in that numbering.
+
+- **Index buffer:** the triangles in decoding order, encoded with version 1 of the triangle codec,
+  read and checked as in version 1 ([6.4](#64-triangles)). The codec may return a triangle starting
+  at another of its corners.
+- **Corners:** a bit stream of 2 bits per triangle, in decoding order. A value *r* turns the
+  decoded triangle (s₀, s₁, s₂) into (s*r*, s*r*+1, s*r*+2), indices taken modulo 3, so 0 keeps
+  it. A reader MUST refuse as malformed the value 3.
+
+These triangles, turned by their corners, are the ones the vertex prediction uses
+([6.8](#68-version-2-vertex-prediction)).
+
+**Connectivity A.** The triangles are in their own order, and the vertices are numbered as the
+mesh numbers them.
+
+**Connectivity B.** The triangles are in the order the writer picked for the codec, usually the one
+meshoptimizer's vertex cache optimizer gives, and the vertices are numbered as the writer picked,
+usually by first use in that order. The **permutation** is a bit stream of *w* bits per triangle,
+in decoding order, where *w* is the bit length of max(*t*, 2) − 1 for *t* triangles. The value for
+the decoded triangle *j* is *p*ⱼ, the triangle's index in its own order. To read the mesh:
+
+1. Put each decoded triangle *j*, turned by its corner, at index *p*ⱼ.
+2. Number the vertices by first use: walk the triangles in their own order, and each one's corners
+   in order; the first vertex met becomes vertex 0, the next new one vertex 1, and so on.
+3. Give each vertex that number, keeping its coordinates, and rename the triangles' corners the
+   same way.
+
+A reader MUST refuse as malformed a permutation value that is not less than *t*, a value that comes
+twice, and a mesh in which the walk does not meet every vertex.
+
+So connectivity B keeps a mesh only if its vertices were numbered by first use, every vertex used.
+A writer MUST NOT use it for any other mesh. Meshes welded from an STL file are numbered that
+way.
+
 ## 7. Chunk registry
 
 Every tag a writer writes MUST be four ASCII letters or digits, the first of them a letter. The case
@@ -418,7 +489,7 @@ file](#44-reading-a-file)).
 | Tag | Version | Per file | Holds | Section |
 |---|---|---|---|---|
 | `SCNE` | 1 | exactly one | the scene: its nodes, their transforms, and the meshes they use | [5](#5-scene-scne) |
-| `MESH` | 1 | any number | one triangle mesh | [6](#6-mesh-mesh) |
+| `MESH` | 2 | any number | one triangle mesh; version 1 is still read | [6](#6-mesh-mesh) |
 | `THMB` | 1 | at most one | a small picture of the file, as a PNG | [8](#8-thumbnail-thmb) |
 | `PROJ` | 1 | at most one | application data: project settings | [7.3](#73-application-chunks) |
 | `SUPP` | 2 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
