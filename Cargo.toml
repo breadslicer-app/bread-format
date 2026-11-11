@@ -26,11 +26,13 @@ unused_qualifications         = "deny"
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 
-# The WebAssembly module of crates/bread-wasm: small, since browsers download
-# it. Built with `--profile wasm`, so the release profile stays as it is.
+# The WebAssembly module of crates/bread-wasm, built with `--profile wasm` so
+# the release profile stays as it is. Optimized for speed: decoding a MESH v2
+# chunk of 2 M triangles takes about 200 ms at level 2 and about 500 ms at
+# "z", for 6 KB more to download (brotli).
 [profile.wasm]
 inherits      = "release"
-opt-level     = "z"
+opt-level     = 2
 lto           = true
 codegen-units = 1
 panic         = "abort"

@@ -7,10 +7,14 @@
 //! browser reads `.bread` files with the same code, checks and all, as every
 //! other program.
 //!
-//! The functions here are plain Rust and tested natively; [`abi`] puts them
-//! behind a small C ABI that the JavaScript package calls.
+//! The functions here are plain Rust and tested natively: [`read_chunks`]
+//! lists a file's chunks, and [`decode_mesh_chunk`] decodes a mesh chunk.
+//! [`abi`] puts them behind a small C ABI that the JavaScript package calls.
 
-use bread_format::{BreadReader, Chunk, ChunkTag, ReadBreadError, supported_version};
+use bread_format::{
+    BreadReader, Chunk, ChunkTag, DecodeMeshError, MESH_TAG, Mesh, ReadBreadError, decode_mesh,
+    decode_mesh_v2, supported_version,
+};
 
 pub mod abi;
 
@@ -43,6 +47,26 @@ pub fn read_chunks(bytes: &[u8]) -> Result<Vec<Chunk>, Refusal> {
         chunks.push(chunk);
     }
     Ok(chunks)
+}
+
+/// The mesh in the payload of a mesh chunk of `version`, as [`read_chunks`]
+/// gives it.
+pub fn decode_mesh_chunk(version: u16, payload: &[u8]) -> Result<Mesh, Refusal> {
+    let refused = |reason| Refusal {
+        reason,
+        chunk: Some(MESH_TAG),
+    };
+    let decoded = match version {
+        1 => decode_mesh(payload),
+        2 => decode_mesh_v2(payload),
+        _ => return Err(refused("version")),
+    };
+    decoded.map_err(|err| {
+        refused(match err {
+            DecodeMeshError::Malformed => "malformed",
+            DecodeMeshError::VertexOutOfRange => "no-such-vertex",
+        })
+    })
 }
 
 fn refusal(err: ReadBreadError) -> Refusal {
