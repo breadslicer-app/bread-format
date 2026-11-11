@@ -1,0 +1,15 @@
+[package]
+name = "corpus-bench"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors = ["SynrgStudio"]
+description = "Measures .bread on a folder of binary STL files: sizes, times, and that every corner comes back."
+repository.workspace = true
+publish = false
+
+[dependencies]
+bread-format = { path = "../../crates/bread-format" }
+
+[lints]
+workspace = true
