@@ -453,3 +453,17 @@ unit = "min"
 what = "the whole run: reading 162 GB of STL, writing every model once, reading it back three times, and checking every corner"
 source = "tools/corpus-bench, run of 2026-11-11"
 date = 2026-11-11
+
+[facts.mz4250_second_reader_sample]
+value = 30
+unit = "models"
+what = "models of the corpus, picked at random, read again with the second reader and compared corner by corner with their STLs: all 30 the same, bit for bit"
+source = "python/ on main, against the .bread files of the reference implementation 0.3.0"
+date = 2026-11-11
+
+[facts.mz4250_second_reader_triangles]
+value = 40504682
+unit = "triangles"
+what = "triangles in that sample"
+source = "same check"
+date = 2026-11-11
