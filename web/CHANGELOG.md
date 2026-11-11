@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-11-11, version 1 is frozen
+
+- `spec_status` is `"frozen"`: the tag `spec-v1` exists.
+- `rules.md`, rule 5: the page may now quote `SPEC.md` as of `spec-v1`, show its layouts and offer
+  the conformance files, hosted on the page. Nothing newer than the tag.
+- `notes/status.md`: the read-through is done.
+- `[project] version` is `0.3.0`, the release of the reference implementation, with `0.2.0`
+  moved to `earlier_versions`. It had stayed at `0.2.0`.
+
 ## 2026-11-11, one Zstandard frame
 
 - `conformance_invalid` is 19: a reader now also refuses a chunk stored as two Zstandard frames in

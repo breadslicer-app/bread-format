@@ -18,14 +18,11 @@ These rules come before everything else in `web/`. Each one says why.
    STL, OBJ, 3MF, glTF. Libraries the format stands on are named with credit: Zstandard,
    meshoptimizer (by Arseny Kapoulkine).
 4. **No links to the repository.** It is private: a link would give the public a 404.
-5. **Not the specification itself, until it is frozen.** Until the tag `spec-v1` exists:
-   - no text of `SPEC.md` copied as it is;
-   - no byte-by-byte layouts, such as tables of field offsets;
-   - no downloads of the conformance files.
-
-   The page explains the format in its own words, with the numbers of `facts.toml` and the
-   explanations in `notes/`: that is what can be shown. It says the specification is a draft and
-   that the full text comes with version 1.
+5. **The specification as frozen, and nothing newer.** Version 1 is frozen (tag `spec-v1`), so the
+   page may quote `SPEC.md` and show its layouts, such as tables of field offsets, and may offer the
+   conformance files as downloads hosted on the page itself (rule 4 still holds). Only the text as
+   of the tag `spec-v1`: a change made after it is shown once a new version of the specification
+   is tagged. Wherever the page quotes it, it says it is version 1.
 6. **No release that has not happened.** The crate is not on crates.io, the JavaScript package is
    not on npm, and the Python reader is not on PyPI. The page does not say they are, or link to
    them, until `facts.toml` says so.

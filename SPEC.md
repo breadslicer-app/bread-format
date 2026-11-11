@@ -1,6 +1,7 @@
 # The `.bread` file format
 
-**Status:** draft. Sections marked "not written yet" are filled in by the issue they name.
+**Status:** version 1, frozen (tag `spec-v1`). From here on, what this document describes changes only
+through new versions ([3.6](#36-stability)).
 
 ## 1. Introduction
 
@@ -119,6 +120,23 @@ The format has no unit field: like STL, it fixes one.
 
 Nothing in a file says where the build plate is: a mesh may sit anywhere, and placing it on the
 plate is up to the program that prints it.
+
+### 3.6 Stability
+
+This is version 1 of this document. Every layout it describes is fixed: the container's, and each
+chunk version's in the [chunk registry](#71-official-chunks). A change to one is made as a new
+version of it ([Versions](#34-versions)), or as a new chunk, never by editing the version described
+here. A new version of this document may add chunks and versions, and may say more where this text
+is unclear, but a file that is valid by this document stays valid, and means the same.
+
+A reader that supports a later version of the container or of a chunk SHOULD keep reading the
+versions described here, so that a file written today keeps opening. For `MESH` this is a
+requirement: a reader that reads it MUST read versions 1 and 2 ([6.6](#66-version-2)). The one
+exception is version 1 of `SUPP` and `HOLW`, written only while this document was a draft, which a
+reader MAY skip ([7.3](#73-application-chunks)).
+
+The conformance files in `conformance/` belong to this version: a reader of version 1 reads each
+valid file as its description says, and refuses each invalid one for its reason.
 
 ## 4. Container
 
