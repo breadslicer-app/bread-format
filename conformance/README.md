@@ -66,12 +66,12 @@ that it gives the expected one:
 | `reason` | The reader finds | Section |
 |---|---|---|
 | `not-bread` | fewer than 8 bytes, or 8 bytes that are not the magic | [4.4](../SPEC.md#44-reading-a-file) |
-| `version` | the container, or a chunk it reads, at a version newer than the ones it supports | [3.4](../SPEC.md#34-versions) |
+| `version` | the container, or a chunk it reads, at a version newer than the ones it supports, or at version 0 | [3.4](../SPEC.md#34-versions) |
 | `cut-short` | the file ends inside the container version, a chunk header or the stored bytes | [4.4](../SPEC.md#44-reading-a-file) |
 | `crc` | stored bytes that do not match their CRC | [4.3](../SPEC.md#43-stored-bytes-and-checksum) |
 | `bad-payload` | stored bytes that are not a valid frame, or that do not decompress to exactly the raw length | [4.4](../SPEC.md#44-reading-a-file) |
 | `chunk-count` | more or fewer chunks of a tag than the format allows, such as two scene chunks | [7.1](../SPEC.md#71-official-chunks) |
-| `malformed` | a payload that is malformed: cut short, padded, a value the format does not allow, a count larger than the bytes left can hold, or a scene that names something that does not exist | [3.3](../SPEC.md#33-malformed-payloads), [5.3](../SPEC.md#53-what-a-reader-checks), [6](../SPEC.md#6-mesh-mesh) |
+| `malformed` | a payload that is malformed: cut short, padded, a value the format does not allow, a count larger than the bytes left can hold, or a chunk that names something that does not exist or breaks a rule about what it names | [3.3](../SPEC.md#33-malformed-payloads), [5.3](../SPEC.md#53-what-a-reader-checks), [6](../SPEC.md#6-mesh-mesh), [7.3](../SPEC.md#73-application-chunks), [9.2](../SPEC.md#92-reading-it), [10.2](../SPEC.md#102-reading-it) |
 | `no-such-vertex` | a triangle that names a vertex its mesh does not have | [6.4](../SPEC.md#64-triangles) |
 
 Some files hold a length or a count far larger than what backs it. A reader that allocates for it

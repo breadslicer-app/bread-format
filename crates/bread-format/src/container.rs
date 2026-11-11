@@ -54,7 +54,8 @@ pub enum ReadBreadError {
     Io(io::Error),
     /// The file does not start with the `.bread` magic.
     NotBread,
-    /// The file was written by a newer container layout.
+    /// The file was written by a newer container layout, or has container
+    /// version 0, which no version is.
     UnsupportedVersion(u16),
     /// The file ends inside a chunk.
     Truncated,
@@ -69,6 +70,7 @@ impl fmt::Display for ReadBreadError {
         match self {
             Self::Io(err) => write!(f, "{err}"),
             Self::NotBread => f.write_str("not a .bread file"),
+            Self::UnsupportedVersion(0) => f.write_str("container version 0, which does not exist"),
             Self::UnsupportedVersion(v) => {
                 write!(f, "written in a newer container version ({v})")
             }
@@ -144,7 +146,7 @@ impl<R: Read> BreadReader<R> {
             return Err(ReadBreadError::NotBread);
         }
         let version = read_u16(&mut input)?;
-        if version > CONTAINER_VERSION {
+        if version == 0 || version > CONTAINER_VERSION {
             return Err(ReadBreadError::UnsupportedVersion(version));
         }
         Ok(Self { input })
