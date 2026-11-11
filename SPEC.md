@@ -267,7 +267,7 @@ Each record starts with a `u8` kind:
 | `1` | leaf | node fields; then a `u32` mesh index |
 | `2` | leaf with a shared mesh | node fields; then a `u32` mesh resource index |
 | `4` | reference | node fields; then a `u32` subtree index |
-| `5` | subtree | a `u32` node index: that node becomes the root of the next subtree |
+| `5` | subtree | a `u32` node index: that node is the root of a new subtree, numbered after the ones before it |
 
 Any other kind, `3` included, makes the payload malformed.
 
@@ -446,7 +446,7 @@ stored. Writers SHOULD write version 2. A reader that reads `MESH` MUST read bot
 
 | Field | Type | Meaning |
 |---|---|---|
-| metadata | metadata | the mesh's name and comment, as in version 1 ([6.2](#62-layout)) |
+| has metadata, name, comment | `u8`, optional strings | the mesh's name and comment: the first three fields of version 1, read the same way ([6.2](#62-layout)) |
 | vertex count | `u32` | how many vertices the mesh has |
 | triangle count | `u32` | how many triangles the mesh has |
 | connectivity | `u8` | how the triangles are stored: `0` A, in their own order; `1` B, reordered ([6.7](#67-version-2-triangles)) |
@@ -491,7 +491,8 @@ mesh numbers them.
 **Connectivity B.** The triangles are in the order the writer picked for the codec, usually the one
 meshoptimizer's vertex cache optimizer gives, and the vertices are numbered as the writer picked,
 usually by first use in that order. The **permutation** is a bit stream of *w* bits per triangle,
-in decoding order, where *w* is the bit length of max(*t*, 2) − 1 for *t* triangles. The value for
+in decoding order, where *w* is the bit length of *m* − 1, with *m* = max(*t*, 2) for *t*
+triangles: 1 bit for up to 2 triangles, 2 bits for up to 4, and so on. The value for
 the decoded triangle *j* is *p*ⱼ, the triangle's index in its own order. To read the mesh:
 
 1. Put each decoded triangle *j*, turned by its corner, at index *p*ⱼ.
@@ -518,7 +519,7 @@ and the triangles in decoding order, turned by their corners.
 coordinate is converted to it exactly, and every operation is rounded to nearest, ties to even, in
 the order written, with no fused multiply-add. Three sums of 3 components start at 0, each with a
 count: *para*, *mid* and *near*. Then, for each triangle that has *v* as a corner, once each, in
-increasing order:
+decoding order:
 
 1. Let *k* be the first corner of the triangle that is *v*, and *a* and *b* the corners after it:
    corners *k* + 1 and *k* + 2, modulo 3. Let **A** and **B** be their coordinates.
@@ -526,8 +527,8 @@ increasing order:
    count 1.
 3. If both *a* < *v* and *b* < *v*:
    - add 0.5 × (**A** + **B**) to *mid*, and count 1;
-   - find the first triangle, in increasing order, other than this one, that has an edge between
-     *a* and *b*. A triangle's edges are its corner pairs (1st, 2nd), (2nd, 3rd) and (3rd, 1st),
+   - find the first triangle in decoding order, among all of them but this one, that has an edge
+     between *a* and *b*. A triangle's edges are its corner pairs (1st, 2nd), (2nd, 3rd) and (3rd, 1st),
      in either direction. If there is one, let *c* be its first corner that is neither *a* nor *b*.
      If there is such a *c* and *c* < *v*, add (**A** + **B**) − **C** to *para*, and count 1.
 
@@ -561,23 +562,28 @@ payload cannot ask for a large mesh, and a reader MUST refuse as malformed a mes
 Each residual *r* becomes a **symbol** from 0 to 131 and some **raw bits**. Let *L* be its bit
 length (0 for 0). If *L* ≤ 1, the symbol is 4*L* and there are no raw bits. Otherwise, let
 *n* = *L* − 1, *h* = min(*n*, 2) and *m* = *n* − *h*: the symbol is
-4*L* + (((*r* >> *m*) mod 2*ʰ*) << (2 − *h*)), and the raw bits are the *m* lowest bits of *r*. A
-reader turns a symbol back into *r* = 2*ⁿ* + ((*s* mod 4) >> (2 − *h*)) << *m*, plus the raw bits.
-It MUST refuse as malformed a symbol no residual gives: one with *L* ≤ 1 and *s* mod 4 ≠ 0, or one
-whose lowest 2 − *h* bits are not 0.
+4*L* + (((*r* >> *m*) mod 2*ʰ*) << (2 − *h*)), and the raw bits are the *m* lowest bits of *r*:
+the symbol holds the bit length and the *h* bits below the highest set bit.
+
+A reader takes *L* = ⌊*s* / 4⌋ from a symbol *s*. If *L* ≤ 1, the residual is *L*. Otherwise, with
+*n*, *h* and *m* as above, it reads *m* raw bits as the value *q*, and the residual is
+*r* = 2*ⁿ* + (((*s* mod 4) >> (2 − *h*)) << *m*) + *q*. It MUST refuse as malformed a symbol no
+residual gives: one with *L* ≤ 1 and *s* mod 4 ≠ 0, or one whose lowest 2 − *h* bits are not 0.
 
 The residuals are coded vertex by vertex, x, y then z, each in a **context**, from 0 to 101:
 34*c* plus, for component *c*:
 
-- x: the largest bit length among the three residuals of the vertex before (0 for vertex 0);
-- y: the bit length of this vertex's x residual;
-- z: the bit lengths of its x and y residuals, added, halved, and rounded up.
+- x: the largest bit length among the three residuals of the vertex before, in decoding numbering
+  (0 for vertex 0);
+- y: *L*ₓ, the bit length of this vertex's x residual;
+- z: ⌈(*L*ₓ + *L*ᵧ) / 2⌉, with *L*ᵧ the bit length of its y residual.
 
 The **tables** part is a bit stream. For each context, in order: 1 bit, set if the context has a
 table. A table is, for each of the 132 symbols in order: 1 bit, set if the symbol has a frequency,
-then that frequency minus 1 in 12 bits. The frequencies of each table MUST add up to 4096. A
-symbol's slots are the 4096 values from the sum of the frequencies of the symbols before it, as
-many as its frequency.
+then that frequency minus 1 in 12 bits. A symbol without the bit has frequency 0. The frequencies of
+each table MUST add up to 4096. A table shares the 4096 slots, 0 to 4095, among its symbols in
+order: a symbol of frequency *f* gets *f* slots in a row, starting at *start*, the sum of the
+frequencies of the symbols before it.
 
 The **stream** part is the rANS state and its bytes. A reader starts with *x*, the first 4 bytes
 as a big-endian `u32`, and reads the next bytes in order. For each residual's symbol, with the
