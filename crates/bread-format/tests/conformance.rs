@@ -27,7 +27,8 @@ use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, Connectivity, DecodeMeshError, DecodeSceneError,
     HollowEntry, MESH_TAG, Mesh, MeshCoding, Meta, Node, NodeKind, ReadBreadError, ReadFileError,
     SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry,
-    THUMBNAIL_TAG, Transform, VertexCoding, encode_mesh_v2_with, read_file, write_file,
+    THUMBNAIL_TAG, Transform, VertexCoding, encode_mesh, encode_mesh_v2_with, read_file,
+    write_file,
 };
 use sha2::{Digest, Sha256, Sha384};
 
@@ -38,6 +39,17 @@ struct Case {
     file: fn() -> BreadFile,
     /// Chunks a reader skips, written right after the scene chunk.
     skipped: &'static [Extra],
+    /// How the meshes are written.
+    meshes: Writing,
+}
+
+/// How a case writes its meshes: as `write_file` does, as version 1, or as
+/// version 2 with given codings.
+#[derive(Clone, Copy)]
+enum Writing {
+    Auto,
+    Version1,
+    Version2(Connectivity, VertexCoding),
 }
 
 /// A chunk the crate does not write: its tag, version and payload.
@@ -49,6 +61,7 @@ const CASES: &[Case] = &[
         description: "One triangle, shown by one leaf, with no names and no transform.",
         file: triangle,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "cube",
@@ -56,6 +69,7 @@ const CASES: &[Case] = &[
                       mesh.",
         file: cube,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "two-parts",
@@ -63,6 +77,7 @@ const CASES: &[Case] = &[
                       moved. One name holds text beyond ASCII, and the group has a comment.",
         file: two_parts,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "shared-mesh",
@@ -70,6 +85,7 @@ const CASES: &[Case] = &[
                       transforms: one moved, one turned, scaled and moved.",
         file: shared_mesh,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "rotated-triangle",
@@ -77,6 +93,7 @@ const CASES: &[Case] = &[
                       stores from another corner: a reader gives back the listed one.",
         file: rotated_triangle,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "unknown-chunk",
@@ -84,6 +101,7 @@ const CASES: &[Case] = &[
                       knows, at version 9, after the scene chunk: a reader skips it.",
         file: triangle,
         skipped: &[(ChunkTag(*b"ZZZZ"), 9, b"a chunk no reader knows")],
+        meshes: Writing::Auto,
     },
     Case {
         name: "private-chunk",
@@ -91,6 +109,7 @@ const CASES: &[Case] = &[
                       that does not know it skips it.",
         file: triangle,
         skipped: &[(ChunkTag(*b"xmpl"), 1, b"example: private data")],
+        meshes: Writing::Auto,
     },
     Case {
         name: "slicer-data",
@@ -99,6 +118,7 @@ const CASES: &[Case] = &[
                       no leaf shows.",
         file: slicer_data,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "thumbnail",
@@ -106,6 +126,7 @@ const CASES: &[Case] = &[
                       2 x 2 pixels, three of them opaque and one transparent.",
         file: thumbnail,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "support-preview",
@@ -114,6 +135,7 @@ const CASES: &[Case] = &[
                       a post under the triangle.",
         file: support_preview,
         skipped: &[],
+        meshes: Writing::Auto,
     },
     Case {
         name: "surface-paint",
@@ -122,6 +144,56 @@ const CASES: &[Case] = &[
                       by its fingerprint.",
         file: surface_paint,
         skipped: &[],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "mesh-version-1",
+        description: "The wavy grid with its mesh as a version 1 chunk, which every reader still reads.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version1,
+    },
+    Case {
+        name: "mesh-a-meshopt",
+        description: "The wavy grid, its triangles in their own order (connectivity A), and its vertices through the meshopt vertex codec.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::InOrder, VertexCoding::Meshopt),
+    },
+    Case {
+        name: "mesh-a-rans",
+        description: "The wavy grid, its triangles in their own order (connectivity A), and its vertices predicted and coded with rANS.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::InOrder, VertexCoding::Rans),
+    },
+    Case {
+        name: "mesh-a-planes",
+        description: "The wavy grid, its triangles in their own order (connectivity A), and its vertices predicted and stored as byte planes.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::InOrder, VertexCoding::Planes),
+    },
+    Case {
+        name: "mesh-b-meshopt",
+        description: "The wavy grid, its triangles reordered with the permutation back (connectivity B), and its vertices through the meshopt vertex codec.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::Reordered, VertexCoding::Meshopt),
+    },
+    Case {
+        name: "mesh-b-rans",
+        description: "The wavy grid, its triangles reordered with the permutation back (connectivity B), and its vertices predicted and coded with rANS.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::Reordered, VertexCoding::Rans),
+    },
+    Case {
+        name: "mesh-b-planes",
+        description: "The wavy grid, its triangles reordered with the permutation back (connectivity B), and its vertices predicted and stored as byte planes.",
+        file: wavy,
+        skipped: &[],
+        meshes: Writing::Version2(Connectivity::Reordered, VertexCoding::Planes),
     },
 ];
 
@@ -196,6 +268,58 @@ fn rotated_triangle() -> BreadFile {
 
 fn cube() -> BreadFile {
     one_leaf(named("cube scene"), named("cube"), cube_mesh("cube mesh"))
+}
+
+/// A 5 x 5 grid of vertices on a wavy surface, 32 triangles listed in a
+/// scattered order, its vertices numbered by first use as connectivity B
+/// needs. Some coordinates are -0.0, a subnormal and both infinities, which a
+/// prediction turns into +0.0.
+fn wavy_mesh() -> Mesh {
+    let at = |x: u32, y: u32| 5 * y + x;
+    let mut grid = Vec::new();
+    for y in 0..4 {
+        for x in 0..4 {
+            let [a, b, c, d] = [at(x, y), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1)];
+            grid.push([a, b, c]);
+            grid.push([c, d, a]);
+        }
+    }
+    let position = |v: u32| -> [f32; 3] {
+        let (x, y) = (v % 5, v / 5);
+        match v {
+            0 => [-0.0, f32::from_bits(1), 0.5],
+            12 => [0.5, 0.5, f32::INFINITY],
+            24 => [1.0, 1.0, f32::NEG_INFINITY],
+            _ => [
+                x as f32 * 0.25,
+                y as f32 * 0.25,
+                ((x * 7 + y * 3) % 5) as f32 * 0.125,
+            ],
+        }
+    };
+    // Every triangle once, in the order 0, 7, 14, ... modulo 32.
+    let mut renumber = [u32::MAX; 25];
+    let mut vertices = Vec::new();
+    let triangles = (0..32)
+        .map(|i| {
+            grid[(i * 7) % 32].map(|v| {
+                if renumber[v as usize] == u32::MAX {
+                    renumber[v as usize] = vertices.len() as u32;
+                    vertices.push(position(v));
+                }
+                renumber[v as usize]
+            })
+        })
+        .collect();
+    Mesh {
+        meta: named("wavy"),
+        vertices,
+        triangles,
+    }
+}
+
+fn wavy() -> BreadFile {
+    one_leaf(None, named("wavy"), wavy_mesh())
 }
 
 /// The SHA-384 fingerprint of `mesh` (`SPEC.md`, section 10.1).
@@ -679,6 +803,43 @@ fn valid_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../conformance/valid")
 }
 
+/// `bytes` with the meshes of `file` written as `writing` says.
+fn with_meshes(bytes: Vec<u8>, file: &BreadFile, writing: Writing) -> Vec<u8> {
+    let encode = |mesh: &Mesh| -> (u16, Vec<u8>) {
+        match writing {
+            Writing::Auto => unreachable!("auto meshes are not rewritten"),
+            Writing::Version1 => (1, encode_mesh(mesh).expect("the mesh encodes")),
+            Writing::Version2(connectivity, vertices) => {
+                let coding = MeshCoding {
+                    connectivity,
+                    vertices,
+                };
+                (
+                    2,
+                    encode_mesh_v2_with(mesh, coding).expect("the mesh encodes"),
+                )
+            }
+        }
+    };
+    if matches!(writing, Writing::Auto) {
+        return bytes;
+    }
+    let mut meshes = file.scene.meshes.iter();
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut writer = BreadWriter::new(Vec::new()).expect("the header writes");
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        let (version, payload) = if chunk.tag == MESH_TAG {
+            encode(meshes.next().expect("one mesh per mesh chunk"))
+        } else {
+            (chunk.version, chunk.payload)
+        };
+        writer
+            .chunk(chunk.tag, version, &payload)
+            .expect("the chunk writes");
+    }
+    writer.finish().expect("the file ends")
+}
+
 /// `bytes` with the `skipped` chunks written right after the scene chunk.
 fn with_skipped(bytes: Vec<u8>, skipped: &[Extra]) -> Vec<u8> {
     if skipped.is_empty() {
@@ -706,6 +867,7 @@ fn with_skipped(bytes: Vec<u8>, skipped: &[Extra]) -> Vec<u8> {
 fn generate(case: &Case) -> (Vec<u8>, String) {
     let file = (case.file)();
     let bytes = write_file(&file, Vec::new()).expect("the case writes");
+    let bytes = with_meshes(bytes, &file, case.meshes);
     let bytes = with_skipped(bytes, case.skipped);
     let back = read_file(bytes.as_slice()).expect("the case reads");
     assert!(back == file, "{} does not come back the same", case.name);
@@ -887,6 +1049,41 @@ const INVALID: &[Invalid] = &[
         chunk: Some(MESH_TAG),
         bytes: huge_vertex_count,
     },
+    Invalid {
+        name: "mesh-unknown-coding",
+        description: "The triangle file with its mesh chunk naming vertex coding 3, which version 2 does not have.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: mesh_unknown_coding,
+    },
+    Invalid {
+        name: "mesh-corner-3",
+        description: "The triangle file with its triangle's corner value set to 3, which names no corner.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: mesh_corner_3,
+    },
+    Invalid {
+        name: "mesh-repeated-permutation",
+        description: "A mesh of two triangles in connectivity B whose permutation puts both at index 0.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: mesh_repeated_permutation,
+    },
+    Invalid {
+        name: "mesh-rans-cut",
+        description: "The triangle file with its vertices coded with rANS and the last byte of the rANS stream cut off.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: mesh_rans_cut,
+    },
+    Invalid {
+        name: "mesh-rans-too-many-vertices",
+        description: "The triangle file with its vertices coded with rANS and its vertex count set to 4, more than 3 per triangle: a reader that allowed it could be asked for a large mesh by a small payload.",
+        reason: "malformed",
+        chunk: Some(MESH_TAG),
+        bytes: mesh_rans_too_many_vertices,
+    },
 ];
 
 /// A file taken apart field by field, to be damaged on purpose.
@@ -1052,13 +1249,13 @@ fn mesh_parts(payload: &[u8]) -> Vec<&[u8]> {
     parts
 }
 
-/// A version 2 mesh payload without metadata, in connectivity A and the
-/// meshopt coding, from its counts and parts.
-fn mesh_payload(vertices: u32, triangles: u32, parts: &[&[u8]]) -> Vec<u8> {
+/// A version 2 mesh payload without metadata, from its counts, coding bytes
+/// and parts.
+fn mesh_payload(vertices: u32, triangles: u32, codings: [u8; 2], parts: &[&[u8]]) -> Vec<u8> {
     let mut payload = vec![0];
     payload.extend(vertices.to_le_bytes());
     payload.extend(triangles.to_le_bytes());
-    payload.extend([0, 0]);
+    payload.extend(codings);
     for part in parts {
         payload.extend(u32::try_from(part.len()).unwrap().to_le_bytes());
         payload.extend(*part);
@@ -1089,8 +1286,140 @@ fn no_such_vertex() -> Vec<u8> {
     let three = encode_mesh_v2_with(&triangle().scene.meshes[0], IN_ORDER_MESHOPT)
         .expect("the triangle encodes");
     let (four, three) = (mesh_parts(&four), mesh_parts(&three));
-    chunks[1].2 = mesh_payload(3, 1, &[four[0], four[1], three[2]]);
+    chunks[1].2 = mesh_payload(3, 1, [0, 0], &[four[0], four[1], three[2]]);
     file_of(&chunks)
+}
+
+/// The triangle file with its mesh written in `coding`, its parts passed
+/// through `edit` with the counts and coding bytes.
+fn triangle_mesh_edited(
+    coding: MeshCoding,
+    edit: impl FnOnce(&mut u32, &mut [u8; 2], &mut Vec<Vec<u8>>),
+) -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    let mesh = Mesh {
+        meta: None,
+        ..triangle().scene.meshes[0].clone()
+    };
+    let payload = encode_mesh_v2_with(&mesh, coding).expect("the triangle encodes");
+    let mut parts: Vec<Vec<u8>> = mesh_parts(&payload)
+        .into_iter()
+        .map(<[u8]>::to_vec)
+        .collect();
+    let mut vertices = 3;
+    let mut codings = [payload[9], payload[10]];
+    edit(&mut vertices, &mut codings, &mut parts);
+    let parts: Vec<&[u8]> = parts.iter().map(Vec::as_slice).collect();
+    chunks[1].2 = mesh_payload(vertices, 1, codings, &parts);
+    file_of(&chunks)
+}
+
+const IN_ORDER_RANS: MeshCoding = MeshCoding {
+    connectivity: Connectivity::InOrder,
+    vertices: VertexCoding::Rans,
+};
+
+fn mesh_unknown_coding() -> Vec<u8> {
+    triangle_mesh_edited(IN_ORDER_MESHOPT, |_, codings, _| codings[1] = 3)
+}
+
+fn mesh_corner_3() -> Vec<u8> {
+    triangle_mesh_edited(IN_ORDER_MESHOPT, |_, _, parts| parts[1] = vec![0b11])
+}
+
+fn mesh_rans_cut() -> Vec<u8> {
+    triangle_mesh_edited(IN_ORDER_RANS, |_, _, parts| {
+        // The parts: index buffer, corners, tables, stream, raw bits.
+        parts[3].pop();
+    })
+}
+
+fn mesh_rans_too_many_vertices() -> Vec<u8> {
+    triangle_mesh_edited(IN_ORDER_RANS, |vertices, _, _| *vertices = 4)
+}
+
+/// Two triangles sharing an edge, in connectivity B, with a permutation of
+/// two 1-bit values, both 0.
+fn mesh_repeated_permutation() -> Vec<u8> {
+    let mut chunks = triangle_payloads();
+    let pair = Mesh {
+        meta: None,
+        vertices: vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+        ],
+        triangles: vec![[0, 1, 2], [2, 1, 3]],
+    };
+    let coding = MeshCoding {
+        connectivity: Connectivity::Reordered,
+        vertices: VertexCoding::Meshopt,
+    };
+    let payload = encode_mesh_v2_with(&pair, coding).expect("the pair encodes");
+    let parts = mesh_parts(&payload);
+    chunks[1].2 = mesh_payload(4, 2, [1, 0], &[parts[0], &[0], parts[2], parts[3]]);
+    // The scene shows one mesh, which is now the pair.
+    file_of(&chunks)
+}
+
+/// Each mesh case stores its mesh in the chunk version and codings its name
+/// says.
+#[test]
+fn the_mesh_cases_use_their_codings() {
+    for case in CASES {
+        let expected: Option<(u16, Option<[u8; 2]>)> = match case.meshes {
+            Writing::Auto => None,
+            Writing::Version1 => Some((1, None)),
+            Writing::Version2(connectivity, vertices) => Some((
+                2,
+                Some([
+                    match connectivity {
+                        Connectivity::InOrder => 0,
+                        Connectivity::Reordered => 1,
+                    },
+                    match vertices {
+                        VertexCoding::Meshopt => 0,
+                        VertexCoding::Rans => 1,
+                        VertexCoding::Planes => 2,
+                    },
+                ]),
+            )),
+        };
+        let Some((version, codings)) = expected else {
+            continue;
+        };
+        let bytes = std::fs::read(valid_dir().join(format!("{}.bread", case.name)))
+            .expect("the file exists");
+        let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+        while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+            if chunk.tag != MESH_TAG {
+                continue;
+            }
+            assert_eq!(chunk.version, version, "{}", case.name);
+            if let Some(codings) = codings {
+                let at = meta_end(&chunk.payload) + 8;
+                assert_eq!(chunk.payload[at..at + 2], codings, "{}", case.name);
+            }
+        }
+    }
+}
+
+/// Where the metadata of a mesh payload ends.
+fn meta_end(payload: &[u8]) -> usize {
+    let text_end = |at: usize| -> usize {
+        if payload[at] == 0 {
+            at + 1
+        } else {
+            let len = u32::from_le_bytes(payload[at + 1..at + 5].try_into().unwrap());
+            at + 5 + usize::try_from(len).unwrap()
+        }
+    };
+    if payload[0] == 0 {
+        1
+    } else {
+        text_end(text_end(1))
+    }
 }
 
 /// The triangle's scene, written by hand with its leaf naming mesh 1.
