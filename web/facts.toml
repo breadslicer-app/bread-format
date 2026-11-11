@@ -293,3 +293,163 @@ unit = "dependencies"
 what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
 source = "python/pyproject.toml"
 date = 2026-11-11
+
+# --- A public corpus: the miniatures of MZ4250 ------------------------------
+# Models by MZ4250, shared under CC BY 4.0, named by their file names.
+# data/mz4250-corpus.json has one row per model; notes/mz4250-corpus.md says
+# how they were measured.
+
+[credit.mz4250]
+creator = "MZ4250"
+printables = "https://www.printables.com/@MZ4250"
+site = "https://mz4250.com/"
+license = "CC BY 4.0"
+license_url = "https://creativecommons.org/licenses/by/4.0/"
+changes = "only measured: no model is redistributed"
+
+[facts.mz4250_models]
+value = 2288
+unit = "models"
+what = "binary STL miniatures by MZ4250, every one measured"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_triangles]
+value = 3240836227
+unit = "triangles"
+what = "triangles in all of them"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_bit_exact]
+value = 2288
+unit = "models"
+what = "models whose every triangle corner came back from the .bread file bit for bit, in the STL's order"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_stl_gb]
+value = 162.0
+unit = "GB"
+what = "all of them as binary STL"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_bread_gb]
+value = 11.6
+unit = "GB"
+what = "all of them as .bread"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_overall]
+value = 14.0
+unit = "x"
+what = "how many times smaller the whole corpus is as .bread than as binary STL"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_median]
+value = 15.1
+unit = "x"
+what = "the median, model by model, of how many times smaller the .bread file is"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_min]
+value = 7.7
+unit = "x"
+what = "the least, model by model"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_max]
+value = 55.7
+unit = "x"
+what = "the most, model by model"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_p10]
+value = 9.4
+unit = "x"
+what = "9 models in 10 are at least this many times smaller"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_ratio_p90]
+value = 22.7
+unit = "x"
+what = "1 model in 10 is at least this many times smaller"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_save_median_ms]
+value = 452
+unit = "ms"
+what = "the median time to write a model as .bread (the median model has 1.19 M triangles)"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_open_median_ms]
+value = 101
+unit = "ms"
+what = "the median time to read a model back from .bread"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_save_mtris]
+value = 2.6
+unit = "M triangles/s"
+what = "triangles written per second, over the whole corpus"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_open_mtris]
+value = 11.9
+unit = "M triangles/s"
+what = "triangles read per second, over the whole corpus"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_largest_triangles]
+value = 11915022
+unit = "triangles"
+what = "the largest model, Treasure Golem"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_largest_stl_mb]
+value = 595.8
+unit = "MB"
+what = "Treasure Golem as binary STL"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_largest_bread_mb]
+value = 24.4
+unit = "MB"
+what = "Treasure Golem as .bread"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_largest_save_s]
+value = 4.2
+unit = "s"
+what = "writing Treasure Golem"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_largest_open_ms]
+value = 823
+unit = "ms"
+what = "reading Treasure Golem back"
+source = "data/mz4250-corpus.json"
+date = 2026-11-11
+
+[facts.mz4250_run_minutes]
+value = 66
+unit = "min"
+what = "the whole run: reading 162 GB of STL, writing every model once, reading it back three times, and checking every corner"
+source = "tools/corpus-bench, run of 2026-11-11"
+date = 2026-11-11

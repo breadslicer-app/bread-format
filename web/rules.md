@@ -5,6 +5,13 @@ These rules come before everything else in `web/`. Each one says why.
 1. **No model names or file names.** The models measured are third parties', or clients', and one
    is a 3D scan of a real person. Name them generically: "a figure of 1.9 M triangles", "a
    sculpture", "a CAD part", "the supports of a large model".
+
+   **The one exception is MZ4250's corpus** (`notes/mz4250-corpus.md`, `data/mz4250-corpus.json`).
+   Those models are shared under CC BY 4.0, so they are named, by their file names, and always with
+   their credit: "Models by MZ4250", a link to https://www.printables.com/@MZ4250 and to
+   https://mz4250.com/, and a link to the licence, https://creativecommons.org/licenses/by/4.0/.
+   One credit for the whole corpus is enough; no link per model. The models themselves, their
+   files, renders or pictures, are not shown.
 2. **No paths and no private research.** Nothing from disk paths, private folders, prototypes or
    test benches beyond what `web/` says.
 3. **No competing products.** Slicers and other products are not named. Other file formats are:

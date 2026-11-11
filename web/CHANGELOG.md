@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-11-11, a public corpus
+
+- **MZ4250's miniatures:** 2,288 models under CC BY 4.0, all measured with the reference
+  implementation 0.3.0. They are in `data/mz4250-corpus.json`, with one row per model, in
+  `notes/mz4250-corpus.md`, and in the facts `mz4250_*`, with the credit in `[credit.mz4250]`.
+- `rules.md`: these models are named, always with that credit. It is the one exception to "no
+  model names".
+
 ## 2026-11-11, a key for the 1.97 M mesh
 
 - New fact `js_mesh_triangles` (1,967,357): the mesh the JavaScript times and the second reader's
