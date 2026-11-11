@@ -4,7 +4,10 @@ What changes in each release of the `bread-format` crate. The format itself is d
 [SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
 read files of an older release differently, and each release says how.
 
-## Unreleased
+## 0.3.0 (2026-11-11)
+
+For use as a git dependency by tag, like 0.2.0. Files open and are written exactly as in 0.2.0,
+except that a file of container version 0 is now refused.
 
 - **Container version 0 is refused** (`SPEC.md`, section 3.4), as a chunk at version 0 already was:
   versions start at 1. No file written by this crate has it.
