@@ -480,3 +480,43 @@ fn version_2_meshes_are_read() {
         assert_eq!(read_file(changed.as_slice()).unwrap(), file, "{vertices:?}");
     }
 }
+
+/// The test file with two meshes large enough to be decoded on threads of
+/// their own, which no leaf shows.
+fn large_file() -> BreadFile {
+    let mut file = file();
+    let mesh = crate::tests_mesh::grid(150);
+    file.scene.meshes.push(mesh.clone());
+    file.scene.meshes.push(mesh);
+    file
+}
+
+#[test]
+fn large_meshes_read_back_as_written() {
+    let file = large_file();
+    let bytes = write(&file);
+    assert_eq!(read_file(bytes.as_slice()).unwrap(), file);
+}
+
+#[test]
+fn a_large_damaged_mesh_comes_before_a_fault_after_it() {
+    let bytes = write(&large_file());
+    let meshes = tags(&bytes).iter().filter(|&&t| t == MESH_TAG).count();
+    let seen = std::cell::Cell::new(0);
+    let mut damaged = rewrite(&bytes, |t, version, mut payload| {
+        if t == MESH_TAG {
+            seen.set(seen.get() + 1);
+            if seen.get() == meshes - 1 {
+                assert!(payload.len() > 1 << 16, "large enough for a thread");
+                payload.pop();
+            }
+        }
+        vec![(t, version, payload)]
+    });
+    // And the file then ends inside a chunk header.
+    damaged.extend_from_slice(b"MESH\x02");
+    assert!(matches!(
+        read_file(damaged.as_slice()),
+        Err(ReadFileError::Mesh(DecodeMeshError::Malformed))
+    ));
+}
