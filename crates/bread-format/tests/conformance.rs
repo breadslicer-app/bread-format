@@ -980,6 +980,13 @@ const INVALID: &[Invalid] = &[
         bytes: newer_container,
     },
     Invalid {
+        name: "container-version-0",
+        description: "The triangle file with container version 0: versions start at 1.",
+        reason: "version",
+        chunk: None,
+        bytes: container_version_0,
+    },
+    Invalid {
         name: "cut-short",
         description: "The triangle file with its last byte cut off, inside the stored bytes of \
                       the mesh chunk.",
@@ -1174,6 +1181,12 @@ fn text_mode_magic() -> Vec<u8> {
 fn newer_container() -> Vec<u8> {
     let mut file = RawFile::triangle();
     file.version = 2;
+    file.bytes()
+}
+
+fn container_version_0() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    file.version = 0;
     file.bytes()
 }
 

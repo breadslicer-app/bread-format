@@ -91,7 +91,7 @@ for (const { name, bytes, json } of cases('invalid')) {
 	}
 }
 
-test('every container case is checked', () => assert.equal(refused, 8));
+test('every container case is checked', () => assert.equal(refused, 9));
 
 test('a refusal leaves the module ready for the next file', () => {
 	const triangle = new Uint8Array(readFileSync(join(conformance, 'valid/triangle.bread')));
