@@ -1,4 +1,4 @@
 # bread-format
 The .bread 3D file: tiny, lossless meshes and scenes, with room for slicer data such as editable supports.
 
-The format is described in [SPEC.md](SPEC.md) (draft).
+The format is described in [SPEC.md](SPEC.md), version 1 (tag `spec-v1`).

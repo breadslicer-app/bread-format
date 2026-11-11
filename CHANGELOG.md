@@ -1,8 +1,9 @@
 # Changelog
 
 What changes in each release of the `bread-format` crate. The format itself is described in
-[SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
-read files of an older release differently, and each release says how.
+[SPEC.md](SPEC.md), version 1 since the tag `spec-v1`. Files valid by version 1 open in every
+later release. Before the freeze, a release could read files of an older release differently,
+and each release said how.
 
 ## Unreleased
 
