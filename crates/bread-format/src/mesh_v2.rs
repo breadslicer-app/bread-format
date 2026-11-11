@@ -832,6 +832,62 @@ pub fn encode_mesh_v2_with(mesh: &Mesh, coding: MeshCoding) -> Result<Vec<u8>, E
     assemble(mesh, coding, &parts)
 }
 
+/// The zstd level the container compresses chunks at, to compare candidates
+/// as they will be stored.
+const STORED_LEVEL: i32 = 3;
+
+fn stored_size(parts: &[Vec<u8>]) -> usize {
+    zstd::bulk::compress(&parts.concat(), STORED_LEVEL).map_or(usize::MAX, |s| s.len())
+}
+
+/// Encodes `mesh` as a mesh chunk payload of version 2, choosing the codings
+/// that store it smallest.
+///
+/// Connectivity B is tried only when the triangle codec needs more than 2
+/// bytes a triangle in the mesh's own order, which is when exporters wrote
+/// the triangles scattered. The three vertex codings are then compared in the
+/// winning order. Every choice is made on the sizes the container stores.
+pub fn encode_mesh_v2(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
+    let a = MeshCoding {
+        connectivity: Connectivity::InOrder,
+        vertices: VertexCoding::Meshopt,
+    };
+    check(mesh, a)?;
+    let mut prepared = prepare(mesh, Connectivity::InOrder);
+    let mut connectivity = Connectivity::InOrder;
+    let nt = mesh.triangles.len();
+    if nt > 0 && prepared.parts[0].len() > 2 * nt && in_first_use_order(mesh) {
+        let b = prepare(mesh, Connectivity::Reordered);
+        if stored_size(&b.parts) < stored_size(&prepared.parts) {
+            prepared = b;
+            connectivity = Connectivity::Reordered;
+        }
+    }
+    let residuals = residuals(&prepared.vertices, &prepared.triangles);
+    let mut best: Option<(usize, MeshCoding, Vec<Vec<u8>>)> = None;
+    for vertices in [
+        VertexCoding::Meshopt,
+        VertexCoding::Rans,
+        VertexCoding::Planes,
+    ] {
+        let coding = MeshCoding {
+            connectivity,
+            vertices,
+        };
+        if check(mesh, coding).is_err() {
+            continue;
+        }
+        let mut parts = prepared.parts.clone();
+        parts.extend(vertex_parts(&prepared, vertices, &residuals));
+        let size = stored_size(&parts);
+        if best.as_ref().is_none_or(|b| size < b.0) {
+            best = Some((size, coding, parts));
+        }
+    }
+    let (_, coding, parts) = best.expect("the meshopt coding stores any mesh");
+    assemble(mesh, coding, &parts)
+}
+
 /// Decodes a mesh chunk payload of version 2.
 pub fn decode_mesh_v2(payload: &[u8]) -> Result<Mesh, DecodeMeshError> {
     decode(&mut In(payload)).ok_or(DecodeMeshError::Malformed)?

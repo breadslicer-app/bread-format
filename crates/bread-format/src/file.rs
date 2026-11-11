@@ -24,10 +24,8 @@ use crate::app::{
     decode_supports, encode_hollows, encode_supports,
 };
 use crate::container::{BreadReader, BreadWriter, ChunkTag, ReadBreadError};
-use crate::mesh::{
-    DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, decode_mesh, encode_mesh,
-};
-use crate::mesh_v2::decode_mesh_v2;
+use crate::mesh::{DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, decode_mesh};
+use crate::mesh_v2::{decode_mesh_v2, encode_mesh_v2};
 use crate::preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
     SupportPreview, decode_previews, encode_previews,
@@ -280,8 +278,8 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
         writer.chunk(SURFACE_TAG, SURFACE_VERSION, &surface)?;
     }
     for mesh in &scene.meshes {
-        let payload = encode_mesh(mesh).map_err(WriteFileError::Mesh)?;
-        writer.chunk(MESH_TAG, 1, &payload)?;
+        let payload = encode_mesh_v2(mesh).map_err(WriteFileError::Mesh)?;
+        writer.chunk(MESH_TAG, MESH_VERSION, &payload)?;
     }
     if !file.support_previews.is_empty() {
         writer.chunk(SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, &previews)?;
