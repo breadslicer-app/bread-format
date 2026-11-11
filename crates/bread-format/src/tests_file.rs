@@ -13,6 +13,7 @@ use crate::file::{
     supported_version, write_file,
 };
 use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
+use crate::mesh_v2::{Connectivity, MeshCoding, VertexCoding, encode_mesh_v2_with};
 use crate::preview::{
     DecodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, SupportPreview,
 };
@@ -452,4 +453,30 @@ fn two_paint_chunks_are_refused() {
             count: 2
         })
     ));
+}
+
+#[test]
+fn version_2_meshes_are_read() {
+    let file = file();
+    let bytes = write(&file);
+    for vertices in [
+        VertexCoding::Meshopt,
+        VertexCoding::Rans,
+        VertexCoding::Planes,
+    ] {
+        let coding = MeshCoding {
+            connectivity: Connectivity::InOrder,
+            vertices,
+        };
+        let index = std::cell::Cell::new(0);
+        let changed = rewrite(&bytes, |tag, version, payload| {
+            if tag != MESH_TAG {
+                return vec![(tag, version, payload)];
+            }
+            let mesh = &file.scene.meshes[index.get()];
+            index.set(index.get() + 1);
+            vec![(MESH_TAG, 2, encode_mesh_v2_with(mesh, coding).unwrap())]
+        });
+        assert_eq!(read_file(changed.as_slice()).unwrap(), file, "{vertices:?}");
+    }
 }

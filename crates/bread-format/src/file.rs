@@ -27,6 +27,7 @@ use crate::container::{BreadReader, BreadWriter, ChunkTag, ReadBreadError};
 use crate::mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, decode_mesh, encode_mesh,
 };
+use crate::mesh_v2::decode_mesh_v2;
 use crate::preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
     SupportPreview, decode_previews, encode_previews,
@@ -280,7 +281,7 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     }
     for mesh in &scene.meshes {
         let payload = encode_mesh(mesh).map_err(WriteFileError::Mesh)?;
-        writer.chunk(MESH_TAG, MESH_VERSION, &payload)?;
+        writer.chunk(MESH_TAG, 1, &payload)?;
     }
     if !file.support_previews.is_empty() {
         writer.chunk(SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, &previews)?;
@@ -322,7 +323,13 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
             HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
             SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
             SURFACE_TAG => surfaces.push(chunk.payload),
-            _ => meshes.push(decode_mesh(&chunk.payload).map_err(ReadFileError::Mesh)?),
+            _ => {
+                let mesh = match chunk.version {
+                    1 => decode_mesh(&chunk.payload),
+                    _ => decode_mesh_v2(&chunk.payload),
+                };
+                meshes.push(mesh.map_err(ReadFileError::Mesh)?);
+            }
         }
     }
     let scene = single(SCENE_TAG, scenes)?.ok_or(ReadFileError::ChunkCount {

@@ -32,8 +32,8 @@ use crate::meta::{Meta, read_meta, write_meta};
 /// The tag of a mesh chunk.
 pub const MESH_TAG: ChunkTag = ChunkTag(*b"MESH");
 
-/// The mesh payload layout this build writes and reads.
-pub const MESH_VERSION: u16 = 1;
+/// The newest mesh payload layout this build reads. Version 1 is read too.
+pub const MESH_VERSION: u16 = 2;
 
 /// The first byte of a vertex buffer: attribute codec version 1.
 const VERTEX_HEADER: u8 = 0xa1;
@@ -73,6 +73,8 @@ pub enum EncodeMeshError {
     /// The mesh has 2^32 or more vertices or triangles, or encodes to 4 GiB
     /// or more.
     TooLarge,
+    /// The mesh does not meet what the chosen version 2 coding needs.
+    Unsupported,
 }
 
 impl fmt::Display for EncodeMeshError {
@@ -80,6 +82,7 @@ impl fmt::Display for EncodeMeshError {
         f.write_str(match self {
             Self::VertexOutOfRange => "a triangle names a vertex the mesh does not have",
             Self::TooLarge => "the mesh is too large for a mesh chunk",
+            Self::Unsupported => "the mesh cannot be stored with the chosen coding",
         })
     }
 }
