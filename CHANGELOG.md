@@ -4,7 +4,11 @@ What changes in each release of the `bread-format` crate. The format itself is d
 [SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
 read files of an older release differently, and each release says how.
 
-## Unreleased
+## 0.2.0 (2026-11-11)
+
+For use as a git dependency by tag, like 0.1.0. **Reading files of 0.1.0:** they open as before,
+their meshes are `MESH` version 1 and are still read. **Writing:** meshes are written as version 2,
+which 0.1.0 refuses, so a file written by 0.2.0 does not open in 0.1.0.
 
 - **Thumbnail** (`SPEC.md`, section 8): `BreadFile::thumbnail` carries the `THMB` chunk, a PNG,
   without decoding it. `write_file` writes it as the first chunk. A file with two thumbnail chunks
