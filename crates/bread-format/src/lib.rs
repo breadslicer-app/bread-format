@@ -60,7 +60,9 @@ pub use file::{
 pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };
-pub use mesh_v2::{Connectivity, MeshCoding, VertexCoding, decode_mesh_v2, encode_mesh_v2_with};
+pub use mesh_v2::{
+    Connectivity, MeshCoding, VertexCoding, decode_mesh_v2, encode_mesh_v2, encode_mesh_v2_with,
+};
 pub use meta::Meta;
 pub use preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,

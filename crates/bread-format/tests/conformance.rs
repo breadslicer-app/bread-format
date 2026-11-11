@@ -24,10 +24,10 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use bread_format::{
-    BreadFile, BreadReader, BreadWriter, ChunkTag, DecodeMeshError, DecodeSceneError, HollowEntry,
-    MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG,
-    SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry, THUMBNAIL_TAG,
-    Transform, encode_mesh, read_file, write_file,
+    BreadFile, BreadReader, BreadWriter, ChunkTag, Connectivity, DecodeMeshError, DecodeSceneError,
+    HollowEntry, MESH_TAG, Mesh, MeshCoding, Meta, Node, NodeKind, ReadBreadError, ReadFileError,
+    SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry,
+    THUMBNAIL_TAG, Transform, VertexCoding, encode_mesh_v2_with, read_file, write_file,
 };
 use sha2::{Digest, Sha256, Sha384};
 
@@ -749,9 +749,8 @@ fn the_rotated_triangle_is_stored_rotated() {
     let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
     while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
         if chunk.tag == MESH_TAG {
-            let payload = &chunk.payload;
-            let count = &payload[payload.len() - 9..payload.len() - 5];
-            assert_eq!(count, 1u32.to_le_bytes(), "the codec rotates the triangle");
+            let parts = mesh_parts(&chunk.payload);
+            assert_eq!(parts[1], [1], "the codec rotates the triangle");
             return;
         }
     }
@@ -1037,13 +1036,40 @@ fn file_of(chunks: &[Payload]) -> Vec<u8> {
     writer.finish().expect("the file ends")
 }
 
-/// Where the vertices of a mesh payload without metadata end: after the
-/// metadata flag, the vertex count, and the vertex buffer's length and bytes.
-fn vertices_end(payload: &[u8]) -> usize {
+/// The parts of a version 2 mesh payload without metadata (`SPEC.md`,
+/// section 6.6): after the metadata flag, the counts and the coding bytes.
+fn mesh_parts(payload: &[u8]) -> Vec<&[u8]> {
     assert_eq!(payload[0], 0, "the mesh has no metadata");
-    let len = u32::from_le_bytes(payload[5..9].try_into().unwrap());
-    9 + usize::try_from(len).unwrap()
+    let mut rest = &payload[11..];
+    let mut parts = Vec::new();
+    while !rest.is_empty() {
+        let (len, tail) = rest.split_at(4);
+        let len = usize::try_from(u32::from_le_bytes(len.try_into().unwrap())).unwrap();
+        let (part, tail) = tail.split_at(len);
+        parts.push(part);
+        rest = tail;
+    }
+    parts
 }
+
+/// A version 2 mesh payload without metadata, in connectivity A and the
+/// meshopt coding, from its counts and parts.
+fn mesh_payload(vertices: u32, triangles: u32, parts: &[&[u8]]) -> Vec<u8> {
+    let mut payload = vec![0];
+    payload.extend(vertices.to_le_bytes());
+    payload.extend(triangles.to_le_bytes());
+    payload.extend([0, 0]);
+    for part in parts {
+        payload.extend(u32::try_from(part.len()).unwrap().to_le_bytes());
+        payload.extend(*part);
+    }
+    payload
+}
+
+const IN_ORDER_MESHOPT: MeshCoding = MeshCoding {
+    connectivity: Connectivity::InOrder,
+    vertices: VertexCoding::Meshopt,
+};
 
 /// The vertices of the triangle with the triangles of a mesh of 4 vertices,
 /// whose triangle names the fourth one.
@@ -1059,10 +1085,11 @@ fn no_such_vertex() -> Vec<u8> {
         ],
         triangles: vec![[0, 1, 3]],
     };
-    let four = encode_mesh(&four).expect("the mesh encodes");
-    let mesh = &mut chunks[1].2;
-    mesh.truncate(vertices_end(mesh));
-    mesh.extend(&four[vertices_end(&four)..]);
+    let four = encode_mesh_v2_with(&four, IN_ORDER_MESHOPT).expect("the mesh encodes");
+    let three = encode_mesh_v2_with(&triangle().scene.meshes[0], IN_ORDER_MESHOPT)
+        .expect("the triangle encodes");
+    let (four, three) = (mesh_parts(&four), mesh_parts(&three));
+    chunks[1].2 = mesh_payload(3, 1, &[four[0], four[1], three[2]]);
     file_of(&chunks)
 }
 
