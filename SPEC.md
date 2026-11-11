@@ -96,6 +96,21 @@ kinds of chunks are added without breaking existing readers.
 A reader MUST refuse a file that holds a chunk it knows at a version newer than the ones it
 supports. Skipping such a chunk could lose data the rest of the file depends on.
 
+### 3.5 Units and axes
+
+The format has no unit field: like STL, it fixes one.
+
+- **Lengths are millimetres.** Every coordinate and every translation is in millimetres. A writer
+  that converts from another unit, such as inches or metres, scales the coordinates on the way in.
+- **Axes are right-handed, with Z up.** The XY plane is the build plate, the plane a printer builds
+  on, and +Z points away from it.
+- **Triangles face outward when wound counterclockwise.** Seen from outside the solid, a
+  triangle's corners SHOULD go counterclockwise, so the right-hand rule gives its outward normal,
+  as in STL. Readers keep the winding as it is stored ([6.1](#61-what-is-kept)).
+
+Nothing in a file says where the build plate is: a mesh may sit anywhere, and placing it on the
+plate is up to the program that prints it.
+
 ## 4. Container
 
 A file is a header followed by chunks, one after another, until the end of the file. There is no
