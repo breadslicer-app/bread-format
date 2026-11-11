@@ -27,6 +27,7 @@
 use crate::bytes::{In, Out, fits_u32};
 use crate::mesh::{DecodeMeshError, EncodeMeshError, Mesh};
 use crate::meta::{read_meta, write_meta};
+use crate::parallel;
 
 /// The first byte of a vertex buffer: attribute codec version 1.
 const VERTEX_HEADER: u8 = 0xa1;
@@ -195,6 +196,20 @@ struct Topology {
 const NONE: u32 = u32::MAX;
 
 fn topology(triangles: &[[u32; 3]], vertex_count: usize) -> Topology {
+    // The two halves do not depend on each other.
+    let ((start, around), across) = parallel::join(
+        || around_vertices(triangles, vertex_count),
+        || across_edges(triangles, vertex_count),
+    );
+    Topology {
+        start,
+        around,
+        across,
+    }
+}
+
+/// `Topology::start` and `Topology::around`.
+fn around_vertices(triangles: &[[u32; 3]], vertex_count: usize) -> (Vec<u32>, Vec<u32>) {
     // Triangles around each vertex, a triangle with a repeated corner once.
     let mut start = vec![0u32; vertex_count + 1];
     for t in triangles {
@@ -217,7 +232,11 @@ fn topology(triangles: &[[u32; 3]], vertex_count: usize) -> Topology {
             }
         }
     }
+    (start, around)
+}
 
+/// `Topology::across`.
+fn across_edges(triangles: &[[u32; 3]], vertex_count: usize) -> Vec<u32> {
     // Edges grouped by their lower vertex, then sorted by their higher one:
     // the per-vertex lists are short in any mesh, and the total work is
     // bounded by the triangle count whatever their degrees.
@@ -263,11 +282,7 @@ fn topology(triangles: &[[u32; 3]], vertex_count: usize) -> Topology {
             }
         }
     }
-    Topology {
-        start,
-        around,
-        across,
-    }
+    across
 }
 
 /// The prediction of vertex `v` from the vertices before it (`SPEC.md`,
@@ -339,11 +354,10 @@ fn residuals(vertices: &[[f32; 3]], triangles: &[[u32; 3]]) -> Vec<[u32; 3]> {
         .collect()
 }
 
-fn rebuild(residuals: &[[u32; 3]], triangles: &[[u32; 3]]) -> Vec<[f32; 3]> {
-    let topo = topology(triangles, residuals.len());
+fn rebuild(residuals: &[[u32; 3]], triangles: &[[u32; 3]], topo: &Topology) -> Vec<[f32; 3]> {
     let mut vertices = vec![[0f32; 3]; residuals.len()];
     for v in 0..residuals.len() {
-        let p = predict(v as u32, triangles, &topo, &vertices);
+        let p = predict(v as u32, triangles, topo, &vertices);
         vertices[v] =
             std::array::from_fn(|i| unord(ord(p[i]).wrapping_add(unzigzag(residuals[v][i]))));
     }
@@ -662,7 +676,6 @@ pub(crate) fn in_first_use_order(mesh: &Mesh) -> bool {
 /// of each reordered triangle.
 fn reorder(mesh: &Mesh) -> (Vec<[u32; 3]>, Vec<[f32; 3]>, Vec<u32>) {
     let n = mesh.vertices.len();
-    let order = meshopt::optimize_vertex_cache(mesh.triangles.as_flattened(), n);
     // Match each reordered triangle to an original one by a key that does
     // not depend on the first corner (the smallest of its three rotations);
     // equal triangles match in any order.
@@ -672,21 +685,32 @@ fn reorder(mesh: &Mesh) -> (Vec<[u32; 3]>, Vec<[f32; 3]>, Vec<u32>) {
             .min()
             .unwrap_or_default()
     };
-    let mut originals: Vec<_> = mesh
-        .triangles
-        .iter()
-        .enumerate()
-        .map(|(i, t)| (key(t), i as u32))
-        .collect();
-    let mut reordered: Vec<_> = order
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .enumerate()
-        .map(|(j, t)| (key(t), j as u32))
-        .collect();
-    originals.sort_unstable();
-    reordered.sort_unstable();
+    // The originals' keys do not need the new order, so they are sorted
+    // while the optimizer finds it.
+    let (reordered, originals) = parallel::join(
+        || {
+            let order = meshopt::optimize_vertex_cache(mesh.triangles.as_flattened(), n);
+            let mut reordered: Vec<_> = order
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .enumerate()
+                .map(|(j, t)| (key(t), j as u32))
+                .collect();
+            reordered.sort_unstable();
+            reordered
+        },
+        || {
+            let mut originals: Vec<_> = mesh
+                .triangles
+                .iter()
+                .enumerate()
+                .map(|(i, t)| (key(t), i as u32))
+                .collect();
+            originals.sort_unstable();
+            originals
+        },
+    );
     let mut permutation = vec![0u32; mesh.triangles.len()];
     for (o, r) in originals.iter().zip(&reordered) {
         debug_assert_eq!(o.0, r.0);
@@ -853,38 +877,54 @@ pub fn encode_mesh_v2(mesh: &Mesh) -> Result<Vec<u8>, EncodeMeshError> {
         vertices: VertexCoding::Meshopt,
     };
     check(mesh, a)?;
-    let mut prepared = prepare(mesh, Connectivity::InOrder);
-    let mut connectivity = Connectivity::InOrder;
+    let in_order = prepare(mesh, Connectivity::InOrder);
     let nt = mesh.triangles.len();
-    if nt > 0 && prepared.parts[0].len() > 2 * nt && in_first_use_order(mesh) {
-        let b = prepare(mesh, Connectivity::Reordered);
-        if stored_size(&b.parts) < stored_size(&prepared.parts) {
-            prepared = b;
-            connectivity = Connectivity::Reordered;
-        }
-    }
-    let residuals = residuals(&prepared.vertices, &prepared.triangles);
-    let mut best: Option<(usize, MeshCoding, Vec<Vec<u8>>)> = None;
-    for vertices in [
-        VertexCoding::Meshopt,
-        VertexCoding::Rans,
-        VertexCoding::Planes,
-    ] {
+    let (prepared, connectivity) =
+        if nt > 0 && in_order.parts[0].len() > 2 * nt && in_first_use_order(mesh) {
+            // B's order takes long to find: A's size is measured meanwhile.
+            let (reordered, in_order_size) = parallel::join(
+                || prepare(mesh, Connectivity::Reordered),
+                || stored_size(&in_order.parts),
+            );
+            if stored_size(&reordered.parts) < in_order_size {
+                (reordered, Connectivity::Reordered)
+            } else {
+                (in_order, Connectivity::InOrder)
+            }
+        } else {
+            (in_order, Connectivity::InOrder)
+        };
+    let try_coding = |vertices: VertexCoding, residuals: &[[u32; 3]]| {
         let coding = MeshCoding {
             connectivity,
             vertices,
         };
-        if check(mesh, coding).is_err() {
-            continue;
-        }
+        check(mesh, coding).ok()?;
         let mut parts = prepared.parts.clone();
-        parts.extend(vertex_parts(&prepared, vertices, &residuals));
-        let size = stored_size(&parts);
-        if best.as_ref().is_none_or(|b| size < b.0) {
-            best = Some((size, coding, parts));
-        }
-    }
-    let (_, coding, parts) = best.expect("the meshopt coding stores any mesh");
+        parts.extend(vertex_parts(&prepared, vertices, residuals));
+        Some((stored_size(&parts), coding, parts))
+    };
+    // The vertex codings are tried side by side: meshopt on its own, and the
+    // two that code the prediction's residuals once they are computed.
+    let (meshopt, predicted) = parallel::join(
+        || try_coding(VertexCoding::Meshopt, &[]),
+        || {
+            let residuals = residuals(&prepared.vertices, &prepared.triangles);
+            let (rans, planes) = parallel::join(
+                || try_coding(VertexCoding::Rans, &residuals),
+                || try_coding(VertexCoding::Planes, &residuals),
+            );
+            [rans, planes]
+        },
+    );
+    // The smallest wins; on a tie, the first in the order meshopt, rANS,
+    // planes.
+    let (_, coding, parts) = [meshopt]
+        .into_iter()
+        .chain(predicted)
+        .flatten()
+        .reduce(|best, next| if next.0 < best.0 { next } else { best })
+        .expect("the meshopt coding stores any mesh");
     assemble(mesh, coding, &parts)
 }
 
@@ -949,18 +989,38 @@ fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
         return None;
     }
 
-    let stored: Vec<u32> = meshopt::decode_index_buffer(index, nt.checked_mul(3)?).ok()?;
-    let triangles = apply_corners(&stored, corners)?;
-    if triangles.as_flattened().iter().any(|&v| v as usize >= n) {
-        return Some(Err(DecodeMeshError::VertexOutOfRange));
-    }
-    let vertices = match coding {
-        VertexCoding::Meshopt => meshopt::decode_vertex_buffer(vertex_parts[0], n).ok()?,
-        VertexCoding::Rans => rebuild(
-            &decode_rans(vertex_parts[0], vertex_parts[1], vertex_parts[2], n)?,
-            &triangles,
-        ),
-        VertexCoding::Planes => rebuild(&decode_planes(vertex_parts[0], n)?, &triangles),
+    // The triangles, with the topology the prediction walks, and the vertex
+    // parts do not depend on each other, so they are decoded side by side.
+    // The triangles' faults still come first, as if decoded one after the
+    // other.
+    let predicted = coding != VertexCoding::Meshopt;
+    let (connectivity_part, vertex_part) = parallel::join(
+        || {
+            let stored: Vec<u32> = meshopt::decode_index_buffer(index, nt.checked_mul(3)?).ok()?;
+            let triangles = apply_corners(&stored, corners)?;
+            if triangles.as_flattened().iter().any(|&v| v as usize >= n) {
+                return Some(Err(DecodeMeshError::VertexOutOfRange));
+            }
+            let topo = predicted.then(|| topology(&triangles, n));
+            Some(Ok((triangles, topo)))
+        },
+        || match coding {
+            VertexCoding::Meshopt => meshopt::decode_vertex_buffer(vertex_parts[0], n)
+                .ok()
+                .map(VertexPart::Vertices),
+            VertexCoding::Rans => decode_rans(vertex_parts[0], vertex_parts[1], vertex_parts[2], n)
+                .map(VertexPart::Residuals),
+            VertexCoding::Planes => decode_planes(vertex_parts[0], n).map(VertexPart::Residuals),
+        },
+    );
+    let (triangles, topo) = match connectivity_part? {
+        Ok(decoded) => decoded,
+        Err(err) => return Some(Err(err)),
+    };
+    let vertices = match (vertex_part?, topo) {
+        (VertexPart::Vertices(vertices), _) => vertices,
+        (VertexPart::Residuals(residuals), Some(topo)) => rebuild(&residuals, &triangles, &topo),
+        (VertexPart::Residuals(_), None) => unreachable!("predicted codings build the topology"),
     };
     let mesh = match permutation {
         None => Mesh {
@@ -971,6 +1031,13 @@ fn decode(input: &mut In<'_>) -> Option<Result<Mesh, DecodeMeshError>> {
         Some(bytes) => restore_order(bytes, vertices, &triangles)?,
     };
     Some(Ok(Mesh { meta, ..mesh }))
+}
+
+/// The vertex part of a mesh, decoded: the vertices themselves, or the
+/// prediction's residuals.
+enum VertexPart {
+    Vertices(Vec<[f32; 3]>),
+    Residuals(Vec<[u32; 3]>),
 }
 
 /// Connectivity B: puts the triangles back in their order, and numbers the

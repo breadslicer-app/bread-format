@@ -24,8 +24,9 @@ use crate::app::{
     decode_supports, encode_hollows, encode_supports,
 };
 use crate::container::{BreadReader, BreadWriter, ChunkTag, ReadBreadError};
-use crate::mesh::{DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, decode_mesh};
+use crate::mesh::{DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh};
 use crate::mesh_v2::{decode_mesh_v2, encode_mesh_v2};
+use crate::parallel;
 use crate::preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
     SupportPreview, decode_previews, encode_previews,
@@ -259,6 +260,11 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     if let Some(leaf) = unsupported_preview(&file.support_previews, &file.supports) {
         return Err(WriteFileError::PreviewWithoutSupports { leaf });
     }
+    // Each mesh is encoded on its own, so they are encoded side by side.
+    let meshes: Vec<Vec<u8>> = parallel::map(&scene.meshes, encode_mesh_v2)
+        .into_iter()
+        .collect::<Result<_, _>>()
+        .map_err(WriteFileError::Mesh)?;
 
     let mut writer = BreadWriter::new(out)?;
     if let Some(thumbnail) = &file.thumbnail {
@@ -277,9 +283,8 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     if !file.surface.is_empty() {
         writer.chunk(SURFACE_TAG, SURFACE_VERSION, &surface)?;
     }
-    for mesh in &scene.meshes {
-        let payload = encode_mesh_v2(mesh).map_err(WriteFileError::Mesh)?;
-        writer.chunk(MESH_TAG, MESH_VERSION, &payload)?;
+    for payload in &meshes {
+        writer.chunk(MESH_TAG, MESH_VERSION, payload)?;
     }
     if !file.support_previews.is_empty() {
         writer.chunk(SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, &previews)?;
@@ -287,9 +292,48 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     Ok(writer.finish()?)
 }
 
+/// Mesh payloads smaller than this are decoded where they are read: a thread
+/// of their own would cost more than it saves.
+const MESH_ON_ITS_OWN_THREAD: usize = 1 << 16;
+
+/// A mesh chunk being decoded, or decoded already.
+enum PendingMesh<'scope> {
+    Done(Result<Mesh, DecodeMeshError>),
+    Running(std::thread::ScopedJoinHandle<'scope, Result<Mesh, DecodeMeshError>>),
+}
+
+impl PendingMesh<'_> {
+    fn finish(self) -> Result<Mesh, DecodeMeshError> {
+        match self {
+            Self::Done(mesh) => mesh,
+            Self::Running(handle) => handle
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic)),
+        }
+    }
+}
+
+fn decode_mesh_chunk(version: u16, payload: &[u8]) -> Result<Mesh, DecodeMeshError> {
+    match version {
+        1 => decode_mesh(payload),
+        _ => decode_mesh_v2(payload),
+    }
+}
+
 /// Reads the `.bread` file in `input`.
+///
+/// Large meshes are decoded on threads of their own while the rest of the
+/// file is read. A file is refused for the same reason as if every chunk
+/// were read in order: the first fault in file order.
 pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     let mut reader = BreadReader::new(input)?;
+    std::thread::scope(|scope| read_chunks(&mut reader, scope))
+}
+
+fn read_chunks<'scope, R: Read>(
+    reader: &mut BreadReader<R>,
+    scope: &'scope std::thread::Scope<'scope, '_>,
+) -> Result<BreadFile, ReadFileError> {
     let (mut thumbnails, mut scenes, mut settings, mut supports, mut hollows, mut previews) = (
         Vec::new(),
         Vec::new(),
@@ -299,37 +343,64 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         Vec::new(),
     );
     let mut surfaces = Vec::new();
-    let mut meshes = Vec::new();
-    while let Some(chunk) = reader.next_chunk()? {
-        let Some(supported) = supported_version(chunk.tag) else {
-            continue;
-        };
-        if chunk.version == 0 || chunk.version > supported {
-            return Err(ReadFileError::ChunkVersion {
-                tag: chunk.tag,
-                version: chunk.version,
-            });
-        }
-        // An older supports or hollows chunk is a draft one: it still counts
-        // as the one chunk of its tag, but its payload is not read.
-        let current = chunk.version == supported;
-        match chunk.tag {
-            THUMBNAIL_TAG => thumbnails.push(chunk.payload),
-            SCENE_TAG => scenes.push(chunk.payload),
-            SETTINGS_TAG => settings.push(chunk.payload),
-            SUPPORTS_TAG => supports.push(current.then_some(chunk.payload)),
-            HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
-            SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
-            SURFACE_TAG => surfaces.push(chunk.payload),
-            _ => {
-                let mesh = match chunk.version {
-                    1 => decode_mesh(&chunk.payload),
-                    _ => decode_mesh_v2(&chunk.payload),
-                };
-                meshes.push(mesh.map_err(ReadFileError::Mesh)?);
+    let mut pending: Vec<PendingMesh<'scope>> = Vec::new();
+    let mut running = std::collections::VecDeque::new();
+    let threads = parallel::threads();
+    let mut read_all = || -> Result<(), ReadFileError> {
+        while let Some(chunk) = reader.next_chunk()? {
+            let Some(supported) = supported_version(chunk.tag) else {
+                continue;
+            };
+            if chunk.version == 0 || chunk.version > supported {
+                return Err(ReadFileError::ChunkVersion {
+                    tag: chunk.tag,
+                    version: chunk.version,
+                });
+            }
+            // An older supports or hollows chunk is a draft one: it still counts
+            // as the one chunk of its tag, but its payload is not read.
+            let current = chunk.version == supported;
+            match chunk.tag {
+                THUMBNAIL_TAG => thumbnails.push(chunk.payload),
+                SCENE_TAG => scenes.push(chunk.payload),
+                SETTINGS_TAG => settings.push(chunk.payload),
+                SUPPORTS_TAG => supports.push(current.then_some(chunk.payload)),
+                HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
+                SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
+                SURFACE_TAG => surfaces.push(chunk.payload),
+                _ => {
+                    let (version, payload) = (chunk.version, chunk.payload);
+                    if threads < 2 || payload.len() < MESH_ON_ITS_OWN_THREAD {
+                        pending.push(PendingMesh::Done(decode_mesh_chunk(version, &payload)));
+                        continue;
+                    }
+                    // At most as many meshes at once as the machine runs threads.
+                    if running.len() >= threads {
+                        let oldest: usize = running.pop_front().expect("one is running");
+                        let mesh = std::mem::replace(
+                            &mut pending[oldest],
+                            PendingMesh::Done(Err(DecodeMeshError::Malformed)),
+                        );
+                        pending[oldest] = PendingMesh::Done(mesh.finish());
+                    }
+                    running.push_back(pending.len());
+                    pending.push(PendingMesh::Running(
+                        scope.spawn(move || decode_mesh_chunk(version, &payload)),
+                    ));
+                }
             }
         }
-    }
+        Ok(())
+    };
+    let read = read_all();
+    // A mesh refused comes before any fault found after it in the file, as
+    // when each mesh is decoded the moment it is read.
+    let meshes = pending
+        .into_iter()
+        .map(PendingMesh::finish)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(ReadFileError::Mesh)?;
+    read?;
     let scene = single(SCENE_TAG, scenes)?.ok_or(ReadFileError::ChunkCount {
         tag: SCENE_TAG,
         count: 0,
