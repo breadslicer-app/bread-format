@@ -19,5 +19,8 @@ The counts are in `facts.toml` (`conformance_valid`, `conformance_invalid`).
 WebAssembly for JavaScript. Every change runs its tests on Linux and on Windows before it is merged,
 and the three platforms write the same bytes for the same file.
 
+**A second reader.** A reader in plain Python, written from the specification alone, reads every
+conformance file the way the reference reader does ([second-reader.md](second-reader.md)).
+
 **Real files.** Beyond the conformance files, real Breadslicer projects are opened, written back
 and read again, and every mesh comes back bit for bit (`facts.toml`: `real_projects`).

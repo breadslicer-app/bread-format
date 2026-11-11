@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-11, later
+
+- `conformance_invalid` is 18: a reader now also refuses container version 0.
+- **The second reader is done:** `notes/second-reader.md`, and the facts `second_reader_spec_gaps`,
+  `second_reader_open_v2_s` and `second_reader_dependencies`. `notes/status.md` ticks it off.
+- `notes/status.md`: the freeze does not wait for Breadslicer.
+
 ## 2026-11-11
 
 The first corpus, for the page at bread.synrgs.tech.

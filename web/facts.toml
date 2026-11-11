@@ -257,8 +257,32 @@ source = "conformance/valid on main"
 date = 2026-11-11
 
 [facts.conformance_invalid]
-value = 17
+value = 18
 unit = "files"
 what = "invalid conformance files, each with the reason a reader must refuse it for"
-source = "conformance/invalid on main"
+source = "conformance/invalid on main (PR #95 added container-version-0)"
+date = 2026-11-11
+
+# --- The second reader ------------------------------------------------------------
+# notes/second-reader.md
+
+[facts.second_reader_spec_gaps]
+value = 6
+unit = "places"
+what = "places where writing a reader from the specification alone showed the text was not enough; each is now spelled out in it"
+source = "PR #95"
+date = 2026-11-11
+
+[facts.second_reader_open_v2_s]
+value = 32
+unit = "s"
+what = "the second reader, plain Python, opening a MESH version 2 mesh of 1.97 M triangles; it favours being readable over being fast"
+source = "PR #94"
+date = 2026-11-11
+
+[facts.second_reader_dependencies]
+value = 0
+unit = "dependencies"
+what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
+source = "python/pyproject.toml"
 date = 2026-11-11
