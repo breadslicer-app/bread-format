@@ -424,6 +424,7 @@ file](#44-reading-a-file)).
 | `SUPP` | 2 | at most one | application data: editable supports | [7.3](#73-application-chunks) |
 | `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
 | `SPRV` | 1 | at most one | a preview of the supports, for readers that skip `SUPP` | [9](#9-support-preview-sprv) |
+| `SURF` | 1 | at most one | paint on the faces of models | [10](#10-surface-paint-surf) |
 
 *Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
 that holds a different number of chunks of that tag than *Per file* allows.
@@ -615,3 +616,65 @@ A reader that skips `SPRV` reads the same file: the support leaves show no mesh,
 A program that changes the supports, or the models they stand on, and writes the file back SHOULD
 write a new preview, or none, so that the preview never shows supports the file no longer holds. A
 program that drops the `SUPP` chunk MUST drop the preview with it.
+
+## 10. Surface paint (`SURF`)
+
+Surface paint is what a person painted on the faces of a model: details to keep, or where supports
+must or must not touch. Each entry is one mask over the triangles of one leaf's mesh. It is
+optional, and nothing else in the file depends on it. This section describes chunk version 1.
+
+### 10.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| entries | count | how many entries follow |
+| leaf | `u32` | the node index of the painted leaf in the scene chunk ([5](#5-scene-scne)) |
+| kind | `u8` | what the paint means: `0` detail, `1` supports must touch, `2` supports must not touch |
+| document version | `u32` | the version of the entry's document |
+| document | byte string | the mask, as below |
+
+The last four fields repeat for every entry, so each entry takes at least 13 bytes. Kinds 3 to 255
+are reserved.
+
+Document version 1:
+
+| Field | Type | Meaning |
+|---|---|---|
+| triangle count | `u32` | how many triangles the painted mesh has |
+| fingerprint | 48 bytes | the SHA-384 digest of the painted mesh, as below |
+| runs | count | how many runs follow |
+| length | `u32` | how many triangles the run covers |
+| value | `u8` | their value: `0` bare, `255` fully painted, the values between a soft brush's |
+
+The last two fields repeat for every run, so each run takes 5 bytes. The runs give the value of
+every triangle in the mesh's order ([6.1](#61-what-is-kept)), the first run starting at the first
+triangle, and their lengths add up to the triangle count.
+
+The fingerprint names the mesh the paint was made on, so that paint never lands on a different
+mesh. It is the SHA-384 digest of these bytes, all little-endian: the vertex count as a `u64`; for
+each vertex in order, the bits of x, y and z as `u32`s; the triangle count as a `u64`; and for each
+triangle in order, its three vertex indices as `u32`s, first corner first. The mesh's name and
+comment are not part of it.
+
+A writer:
+
+- MUST name leaves only, and MUST NOT write two entries with the same leaf and kind;
+- SHOULD write the entries in increasing order of leaf, then kind, and the chunk after the
+  application chunks and before the `MESH` chunks;
+- SHOULD write no entry for a support leaf ([`SUPP`](#supp-supports)), whose mesh is empty.
+
+### 10.2 Reading it
+
+A reader that reads `SURF`:
+
+- MUST refuse the file if an entry names no node of the scene or a node that is not a leaf, or if two
+  entries have the same leaf and kind.
+- MUST NOT refuse the file for what a document holds. It SHOULD treat each of these entries as
+  absent: one of a reserved kind; one whose document version is newer than the ones it supports; one
+  whose document is malformed; one whose triangle count or fingerprint does not match the leaf's mesh;
+  and one whose runs do not cover exactly that many triangles.
+
+A program that changes a leaf's mesh and writes the file back SHOULD repaint it, or drop its paint.
+Leaving it is harmless, since the fingerprint no longer matches, but it takes room for nothing.
+
+A reader that skips `SURF` reads the same scene, without the paint.
