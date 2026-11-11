@@ -212,6 +212,13 @@ what = "write the figure natively, mesh as MESH version 2"
 source = "measured with the reference implementation; PR #87 gives 0.46-0.51 s for 1.7-2.1 M triangles"
 date = 2026-11-11
 
+[facts.js_mesh_triangles]
+value = 1967357
+unit = "triangles"
+what = "triangles of the mesh the JavaScript and second-reader times use: another weld of the same figure"
+source = "PR #92; counted with the reference implementation"
+date = 2026-11-11
+
 [facts.open_js_v2_ms]
 value = 200
 unit = "ms"
