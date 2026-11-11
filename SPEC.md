@@ -471,6 +471,101 @@ So connectivity B keeps a mesh only if its vertices were numbered by first use, 
 A writer MUST NOT use it for any other mesh. Meshes welded from an STL file are numbered that
 way.
 
+### 6.8 Version 2 vertex prediction
+
+Codings `1` and `2` store, for each vertex, the difference between it and a **prediction** made
+from vertices decoded before it. Vertices are decoded in increasing number, in the decoding
+numbering ([6.7](#67-version-2-triangles)), so vertex *v* is predicted from vertices 0 to *v* − 1
+and the triangles in decoding order, turned by their corners.
+
+**The prediction of vertex *v*.** Every value below is an IEEE 754 binary64 (`f64`), every
+coordinate is converted to it exactly, and every operation is rounded to nearest, ties to even, in
+the order written, with no fused multiply-add. Three sums of 3 components start at 0, each with a
+count: *para*, *mid* and *near*. Then, for each triangle that has *v* as a corner, once each, in
+increasing order:
+
+1. Let *k* be the first corner of the triangle that is *v*, and *a* and *b* the corners after it:
+   corners *k* + 1 and *k* + 2, modulo 3. Let **A** and **B** be their coordinates.
+2. If *a* < *v*, add **A** to *near*, and count 1. Then, if *b* < *v*, add **B** to *near*, and
+   count 1.
+3. If both *a* < *v* and *b* < *v*:
+   - add 0.5 × (**A** + **B**) to *mid*, and count 1;
+   - find the first triangle, in increasing order, other than this one, that has an edge between
+     *a* and *b*. A triangle's edges are its corner pairs (1st, 2nd), (2nd, 3rd) and (3rd, 1st),
+     in either direction. If there is one, let *c* be its first corner that is neither *a* nor *b*.
+     If there is such a *c* and *c* < *v*, add (**A** + **B**) − **C** to *para*, and count 1.
+
+The prediction is the first of these with a count above 0: *para*, *mid*, *near*. Each component is
+the sum divided by its count. If all three counts are 0, the prediction is vertex *v* − 1, or
+(0, 0, 0) for vertex 0. Each component is then rounded to `f32` (to nearest, ties to even), and a
+component that is not finite becomes +0.0.
+
+**The residual.** Let ord(*x*) map the bits *u* of an `f32` to a `u32` that orders as the values
+do: the bitwise complement of *u* if its sign bit is set, otherwise *u* with its sign bit set. For
+each component, the residual is zigzag((ord(*x*) − ord(*p*)) mod 2³²) for coordinate *x* and
+prediction *p*, where zigzag maps the `u32` *d*, read as a two's complement `i32`, to 2*d* for
+*d* ≥ 0 and −2*d* − 1 for *d* < 0. A reader undoes both steps: *x* is the `f32` whose ord is
+(ord(*p*) + *d*) mod 2³². Any residual gives back some `f32`, NaN payloads and −0.0 included, so
+the coordinates come back bit for bit.
+
+### 6.9 Version 2 vertex codings
+
+**Coding `0`, meshopt.** One part: a vertex buffer of the vertices in decoding numbering, encoded
+and checked as in version 1 ([6.3](#63-vertices)).
+
+**Coding `2`, byte planes.** One part of exactly 12 bytes per vertex, holding 12 planes of one byte
+per vertex. Plane 4*c* + *i* holds byte *i* (0 is the least significant) of the residual of
+component *c* (0 is x, 1 y, 2 z), vertex by vertex. A reader MUST refuse as malformed a part of
+any other length. The chunk's zstd compresses the planes.
+
+**Coding `1`, rANS.** The residuals are coded with static rANS, in three parts: tables, stream and
+raw bits. The vertex count MUST NOT be more than 3 times the triangle count, so that a small
+payload cannot ask for a large mesh, and a reader MUST refuse as malformed a mesh that breaks this.
+
+Each residual *r* becomes a **symbol** from 0 to 131 and some **raw bits**. Let *L* be its bit
+length (0 for 0). If *L* ≤ 1, the symbol is 4*L* and there are no raw bits. Otherwise, let
+*n* = *L* − 1, *h* = min(*n*, 2) and *m* = *n* − *h*: the symbol is
+4*L* + (((*r* >> *m*) mod 2*ʰ*) << (2 − *h*)), and the raw bits are the *m* lowest bits of *r*. A
+reader turns a symbol back into *r* = 2*ⁿ* + ((*s* mod 4) >> (2 − *h*)) << *m*, plus the raw bits.
+It MUST refuse as malformed a symbol no residual gives: one with *L* ≤ 1 and *s* mod 4 ≠ 0, or one
+whose lowest 2 − *h* bits are not 0.
+
+The residuals are coded vertex by vertex, x, y then z, each in a **context**, from 0 to 101:
+34*c* plus, for component *c*:
+
+- x: the largest bit length among the three residuals of the vertex before (0 for vertex 0);
+- y: the bit length of this vertex's x residual;
+- z: the bit lengths of its x and y residuals, added, halved, and rounded up.
+
+The **tables** part is a bit stream. For each context, in order: 1 bit, set if the context has a
+table. A table is, for each of the 132 symbols in order: 1 bit, set if the symbol has a frequency,
+then that frequency minus 1 in 12 bits. The frequencies of each table MUST add up to 4096. A
+symbol's slots are the 4096 values from the sum of the frequencies of the symbols before it, as
+many as its frequency.
+
+The **stream** part is the rANS state and its bytes. A reader starts with *x*, the first 4 bytes
+as a big-endian `u32`, and reads the next bytes in order. For each residual's symbol, with the
+table of its context:
+
+1. *slot* = *x* mod 4096; the symbol *s* is the one whose slots hold *slot*, with frequency *f*
+   and first slot *start*;
+2. *x* = *f* × (*x* >> 12) + *slot* − *start*;
+3. while *x* < 2²³: *x* = *x* × 256 + the next byte.
+
+A reader MUST refuse as malformed a residual whose context has no table, a stream that runs out of
+bytes, and a stream that ends with bytes left or with *x* other than 2²³.
+
+The **raw bits** part is a bit stream of every residual's raw bits, in the same order.
+
+A writer codes the symbols in reverse order with the matching rANS encoder, starting from
+*x* = 2²³ and writing *x*'s bytes out while *x* ≥ 2¹⁹ × *f*, then reverses the bytes. It MAY build
+the tables any way that fits the rules, such as from how often each symbol comes in each context.
+
+**Choosing.** A writer MAY use any coding the mesh meets the rules of, and SHOULD use the one that
+stores it smallest. For example: connectivity B only when connectivity A's index buffer takes more
+than 2 bytes per triangle and B stores the triangles smaller, then the vertex coding whose chunk,
+compressed as the container compresses it, is smallest.
+
 ## 7. Chunk registry
 
 Every tag a writer writes MUST be four ASCII letters or digits, the first of them a letter. The case
