@@ -17,6 +17,10 @@ read files of an older release differently, and each release says how.
   checked when reading and when writing. A file whose supports chunk is a draft (version 1) opens
   without its previews. `BreadFile` has a new field, so code that builds one with every field named
   needs `support_previews: Vec::new()`.
+- **Mesh chunk version 2** (`SPEC.md`, sections 6.6 to 6.9): `decode_mesh_v2` and
+  `encode_mesh_v2_with` (with `MeshCoding`, `Connectivity` and `VertexCoding`), and `read_file`
+  reads `MESH` chunks of versions 1 and 2. `MESH_VERSION` is now 2, the newest version read.
+  `EncodeMeshError` has a new variant, `Unsupported`, for a mesh a chosen coding cannot store.
 - **Surface paint** (`SPEC.md`, section 10): `BreadFile::surface` carries the `SURF` chunk, paint on
   the faces of leaves, as `SurfaceEntry { leaf, kind, version, document }`. Only the envelope is
   checked (each entry names a leaf, no two share a leaf and a kind); documents are carried without

@@ -24,6 +24,7 @@ mod bytes;
 pub mod container;
 pub mod file;
 pub mod mesh;
+pub mod mesh_v2;
 mod meta;
 pub mod preview;
 pub mod scene;
@@ -37,6 +38,8 @@ mod tests_container;
 mod tests_file;
 #[cfg(test)]
 mod tests_mesh;
+#[cfg(test)]
+mod tests_mesh_v2;
 #[cfg(test)]
 mod tests_preview;
 #[cfg(test)]
@@ -57,6 +60,7 @@ pub use file::{
 pub use mesh::{
     DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh, encode_mesh,
 };
+pub use mesh_v2::{Connectivity, MeshCoding, VertexCoding, decode_mesh_v2, encode_mesh_v2_with};
 pub use meta::Meta;
 pub use preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,

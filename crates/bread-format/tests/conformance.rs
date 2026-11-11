@@ -852,7 +852,7 @@ const INVALID: &[Invalid] = &[
     },
     Invalid {
         name: "newer-chunk",
-        description: "The triangle file with its mesh chunk at version 2, which this version of \
+        description: "The triangle file with its mesh chunk at version 3, which this version of \
                       the format does not describe.",
         reason: "version",
         chunk: Some(MESH_TAG),
@@ -1008,7 +1008,7 @@ fn huge_raw_length() -> Vec<u8> {
 
 fn newer_chunk() -> Vec<u8> {
     let mut file = RawFile::triangle();
-    file.chunk(MESH_TAG).version = 2;
+    file.chunk(MESH_TAG).version = 3;
     file.bytes()
 }
 
