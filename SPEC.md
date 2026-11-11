@@ -81,9 +81,15 @@ in the payload: items that take at least *k* bytes each cannot number more than 
 divided by *k*. This way a damaged count cannot make a reader ask for more memory than the file
 holds.
 
+Some rules below say that a reader MUST refuse the file because of what a chunk names or holds, such
+as a scene whose mesh count does not match the file, or a supports entry that names no leaf. That
+chunk is malformed too: a reader that says why it refuses a file ([4.4](#44-reading-a-file))
+reports a malformed payload of the chunk whose section states the rule.
+
 ### 3.4 Versions
 
-Versions are `u16` numbers that start at 1 and only go up. They live in two places:
+Versions are `u16` numbers that start at 1 and only go up, so 0 is no version. They live in two
+places:
 
 - **The container version**, in the file header, covers the header and the chunk layout. A reader
   MUST refuse a file whose container version is newer than the ones it supports.
@@ -95,6 +101,9 @@ kinds of chunks are added without breaking existing readers.
 
 A reader MUST refuse a file that holds a chunk it knows at a version newer than the ones it
 supports. Skipping such a chunk could lose data the rest of the file depends on.
+
+A reader MUST refuse a file whose container version is 0, or that holds a chunk it knows at
+version 0, as it refuses a newer one.
 
 ### 3.5 Units and axes
 
@@ -373,8 +382,20 @@ The codec works on bytes and keeps every one of them, so it keeps every bit of e
 - Every block of up to 256 vertices starts with a 3-byte control header, so a buffer of *L* bytes
   holds fewer than 256 × *L* / 3 vertices. A larger vertex count is malformed, and a reader MUST
   refuse it before allocating for it ([Malformed payloads](#33-malformed-payloads)).
-- A buffer that ends before every vertex is decoded, or that has bytes left over before its tail
-  block, is malformed.
+- A buffer that ends before every vertex is decoded, or that has bytes left over before its tail,
+  is malformed.
+
+The published text leaves three details of the bitstream to its reference implementation. With a
+byte stride of 12, they are:
+
+- **The tail** is the last 24 bytes of the buffer: 9 bytes of zero padding, the 12-byte baseline
+  element, then the 3 channel mode bytes. The attribute blocks end where the tail starts.
+- **Control mode 3**, literal, stores one delta byte per element of its attribute block: as many
+  bytes as the block has elements, not rounded up to a whole group of 16. They are deltas, turned
+  back into values by the channel mode like any others.
+- **Channel mode 2**, XOR, stores the XOR of each 4-byte value with the previous element's,
+  rotated left by *r* bits, where *r* is the high 4 bits of the channel mode byte. A reader rotates
+  the stored value right by *r* bits and XORs it with the previous element's value.
 
 ### 6.4 Triangles
 
@@ -572,9 +593,13 @@ bytes, and a stream that ends with bytes left or with *x* other than 2²³.
 
 The **raw bits** part is a bit stream of every residual's raw bits, in the same order.
 
-A writer codes the symbols in reverse order with the matching rANS encoder, starting from
-*x* = 2²³ and writing *x*'s bytes out while *x* ≥ 2¹⁹ × *f*, then reverses the bytes. It MAY build
-the tables any way that fits the rules, such as from how often each symbol comes in each context.
+A writer codes the symbols with the matching rANS encoder, from the last to the first. It starts
+with *x* = 2²³. For each symbol, with frequency *f* and first slot *start*, it writes out *x*'s
+lowest byte and shifts *x* right by 8 bits while *x* ≥ 2¹⁹ × *f*, then sets
+*x* = ⌊*x* / *f*⌋ × 4096 + (*x* mod *f*) + *start*. At the end it writes *x*'s 4 bytes, least
+significant first, and reverses all the bytes it wrote, so that the stream starts with the last *x*,
+big-endian. It MAY build the tables any way that fits the rules, such as from how often each
+symbol comes in each context.
 
 **Choosing.** A writer MAY use any coding the mesh meets the rules of, and SHOULD use the one that
 stores it smallest. For example: connectivity B only when connectivity A's index buffer takes more
