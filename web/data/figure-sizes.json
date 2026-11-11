@@ -1,0 +1,20 @@
+{
+  "what": "One figure, a single mesh, stored losslessly seven ways. Sizes in bytes.",
+  "date": "2026-11-11",
+  "mesh": { "triangles": 1898864, "vertices": 949406 },
+  "sizes": {
+    "stl_binary": 94943284,
+    "obj": 69727939,
+    "stl_zip_deflate_9": 39319321,
+    "stl_7z_mx9": 32191802,
+    "obj_zstd_19": 12449688,
+    "bread_mesh_v1_chunk": 7776901,
+    "bread_mesh_v2_chunk": 6577636
+  },
+  "notes": [
+    "The .bread sizes are the MESH chunk with its 26-byte header, as the reference implementation 0.2.0 + main compresses it (zstd level 3). A whole file adds the 10-byte file header and a scene chunk of a few dozen bytes.",
+    "The STL has a facet normal per triangle, computed from its corners and normalized, as STL writers do, and zero attribute bytes.",
+    "The OBJ has a 'v' line per vertex, each coordinate the shortest decimal that reads back as the same f32, and an 'f' line per triangle.",
+    "notes/measurements.md says how each was made."
+  ]
+}

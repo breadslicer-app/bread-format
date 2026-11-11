@@ -1,0 +1,288 @@
+# What is true about the .bread format and can be published. Every number
+# the page at bread.synrgs.tech shows comes from here, by its key.
+# Sizes are decimal: 1 MB = 1,000,000 bytes, 1 KB = 1,000 bytes.
+
+[project]
+name = ".bread"
+expansion = "Bit-exact Representation of Editable Assembly Data"
+extension = ".bread"
+magic = "42 52 45 41 44 00 0D 0A"
+container_version = 1
+chunk_versions = { SCNE = 1, MESH = 2, THMB = 1, PROJ = 1, SUPP = 2, HOLW = 2, SPRV = 1, SURF = 1 }
+mesh_versions_read = [1, 2]
+spec_status = "draft"           # "frozen" once the tag spec-v1 exists
+license = "Apache-2.0"
+reference_implementation = "bread-format, a Rust crate, also built to WebAssembly for JavaScript"
+version = "0.2.0"               # of the reference implementation
+released = 2026-11-11
+earlier_versions = [{ version = "0.1.0", released = 2026-10-30 }]
+units = "millimetres; right-handed axes, Z up, XY is the build plate"
+# No repo or download links: the repository is private until the spec is frozen.
+
+# --- The 1.9 M triangle figure ---------------------------------------------
+# One mesh, a figure, stored losslessly seven ways. data/figure-sizes.json has
+# the exact bytes; notes/measurements.md says how each was made.
+
+[facts.figure_triangles]
+value = 1898864
+unit = "triangles"
+what = "triangles of the figure the size table uses"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_vertices]
+value = 949406
+unit = "vertices"
+what = "vertices of the same figure"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_stl_binary_mb]
+value = 94.9
+unit = "MB"
+what = "the figure as binary STL"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_obj_mb]
+value = 69.7
+unit = "MB"
+what = "the figure as OBJ, every coordinate as the shortest decimal that reads back as the same f32"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_stl_zip_mb]
+value = 39.3
+unit = "MB"
+what = "the binary STL in a zip, Deflate at level 9"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_stl_7z_mb]
+value = 32.2
+unit = "MB"
+what = "the binary STL in a 7z archive, at level 9 (-mx=9)"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_obj_zstd19_mb]
+value = 12.4
+unit = "MB"
+what = "the OBJ compressed with Zstandard at level 19"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_bread_v1_mb]
+value = 7.8
+unit = "MB"
+what = "the figure as a .bread file with its mesh as MESH version 1"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_bread_v2_mb]
+value = 6.6
+unit = "MB"
+what = "the figure as a .bread file with its mesh as MESH version 2, as the reference implementation writes it"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_stl_over_bread]
+value = 14.4
+unit = "x"
+what = "how many times smaller the .bread file (MESH version 2) is than the binary STL"
+source = "data/figure-sizes.json"
+date = 2026-11-11
+
+[facts.figure_lost_bits]
+value = 0
+unit = "bits"
+what = "bits lost in any of the seven: every one keeps every coordinate and every triangle"
+source = "data/figure-sizes.json; the .bread files are read back and compared bit for bit"
+date = 2026-11-11
+
+# --- MESH version 2 against version 1 -----------------------------------------
+
+[facts.v2_figure_change]
+value = -15
+unit = "%"
+what = "MESH version 2 against version 1 on the figure: same content, bit for bit"
+source = "data/figure-sizes.json (-15.4%); PR #86 (-14.8% on another weld of the same figure)"
+date = 2026-11-11
+
+[facts.v2_corpus_change]
+value = -24.7
+unit = "%"
+what = "MESH version 2 against version 1 over a corpus of 22 meshes; no mesh gets larger"
+source = "issue #75, prototype; PR #86 measured the same sizes with the reference implementation"
+date = 2026-11-10
+
+[facts.v2_corpus_meshes]
+value = 22
+unit = "meshes"
+what = "meshes in that corpus: figures, sculptures, scans, CAD parts and supports"
+source = "issue #75"
+date = 2026-11-10
+
+[facts.v2_corpus_stl_mb]
+value = 255
+unit = "MB"
+what = "the corpus as binary STL"
+source = "issue #75"
+date = 2026-11-10
+
+[facts.v2_corpus_ratio_min]
+value = 5.9
+unit = "x"
+what = "the least, mesh by mesh over the corpus, that MESH version 2 is smaller than the binary STL"
+source = "issue #75"
+date = 2026-11-10
+
+[facts.v2_corpus_ratio_max]
+value = 9.1
+unit = "x"
+what = "the most, mesh by mesh over the corpus, that MESH version 2 is smaller than the binary STL"
+source = "issue #75"
+date = 2026-11-10
+
+[facts.v2_supports_change]
+value = -36
+unit = "%"
+what = "MESH version 2 against version 1 on the supports mesh of a large model"
+source = "PR #86 (-36.0%)"
+date = 2026-11-11
+
+[facts.v2_sculpture_change_min]
+value = -19
+unit = "%"
+what = "MESH version 2 against version 1 on sculptures and scans: the smallest gain (-19.2%)"
+source = "PR #86"
+date = 2026-11-11
+
+[facts.v2_sculpture_change_max]
+value = -27
+unit = "%"
+what = "MESH version 2 against version 1 on sculptures: the largest gain"
+source = "PR #86"
+date = 2026-11-11
+
+# --- Real projects --------------------------------------------------------------
+
+[facts.real_projects]
+value = 15
+unit = "projects"
+what = "real Breadslicer projects opened, written back by the reference implementation and read again: every mesh bit for bit"
+source = "measured with the reference implementation 0.2.0 + main"
+date = 2026-11-11
+
+[facts.real_projects_change_min]
+value = -8.8
+unit = "%"
+what = "the smallest gain in file size over those projects, written back with MESH version 2"
+source = "same measurement"
+date = 2026-11-11
+
+[facts.real_projects_change_max]
+value = -36
+unit = "%"
+what = "the largest gain over 13 of them; the other two shrink by 54 and 57%, because they also held an old draft chunk that is not written back"
+source = "same measurement"
+date = 2026-11-11
+
+# --- Speed and weight -------------------------------------------------------------
+# A desktop PC. WebAssembly runs in Node 26 on V8, the engine of Chrome.
+
+[facts.open_native_v1_ms]
+value = 39
+unit = "ms"
+what = "open the figure natively, mesh as MESH version 1, best of 5"
+source = "measured with the reference implementation"
+date = 2026-11-11
+
+[facts.open_native_v2_ms]
+value = 168
+unit = "ms"
+what = "open the figure natively, mesh as MESH version 2, best of 5"
+source = "measured with the reference implementation"
+date = 2026-11-11
+
+[facts.save_v2_s]
+value = 0.43
+unit = "s"
+what = "write the figure natively, mesh as MESH version 2"
+source = "measured with the reference implementation; PR #87 gives 0.46-0.51 s for 1.7-2.1 M triangles"
+date = 2026-11-11
+
+[facts.open_js_v2_ms]
+value = 200
+unit = "ms"
+what = "open a MESH version 2 mesh of 1.97 M triangles from JavaScript, warm (191-207 ms)"
+source = "PR #92"
+date = 2026-11-11
+
+[facts.open_js_v2_first_ms]
+value = 350
+unit = "ms"
+what = "the same, the first time, while V8 still compiles the module (330-370 ms)"
+source = "PR #92"
+date = 2026-11-11
+
+[facts.open_js_v1_ms]
+value = 60
+unit = "ms"
+what = "open the same mesh from JavaScript as MESH version 1 (55-64 ms)"
+source = "PR #92"
+date = 2026-11-11
+
+[facts.web_reader_kb]
+value = 71
+unit = "KB"
+what = "the WebAssembly module that reads .bread in JavaScript, compressed with brotli; it reads, it does not write"
+source = "dist/bread.wasm of main, 70,884 bytes with brotli at quality 11"
+date = 2026-11-11
+
+[facts.identical_platforms]
+value = 3
+unit = "platforms"
+what = "Windows, Linux and WebAssembly write the same bytes for the same file"
+source = "CI on Linux and Windows; PR #87 for WebAssembly"
+date = 2026-11-11
+
+# --- Conformance ---------------------------------------------------------------
+
+[facts.conformance_valid]
+value = 18
+unit = "files"
+what = "valid conformance files, each with a JSON of what it holds"
+source = "conformance/valid on main"
+date = 2026-11-11
+
+[facts.conformance_invalid]
+value = 18
+unit = "files"
+what = "invalid conformance files, each with the reason a reader must refuse it for"
+source = "conformance/invalid on main (PR #95 added container-version-0)"
+date = 2026-11-11
+
+# --- The second reader ------------------------------------------------------------
+# notes/second-reader.md
+
+[facts.second_reader_spec_gaps]
+value = 6
+unit = "places"
+what = "places where writing a reader from the specification alone showed the text was not enough; each is now spelled out in it"
+source = "PR #95"
+date = 2026-11-11
+
+[facts.second_reader_open_v2_s]
+value = 32
+unit = "s"
+what = "the second reader, plain Python, opening a MESH version 2 mesh of 1.97 M triangles; it favours being readable over being fast"
+source = "PR #94"
+date = 2026-11-11
+
+[facts.second_reader_dependencies]
+value = 0
+unit = "dependencies"
+what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
+source = "python/pyproject.toml"
+date = 2026-11-11
