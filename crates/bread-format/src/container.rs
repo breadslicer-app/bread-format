@@ -176,6 +176,9 @@ impl<R: Read> BreadReader<R> {
         if crc32fast::hash(&stored) != crc {
             return Err(ReadBreadError::Corrupt(tag));
         }
+        if !is_one_frame(&stored) {
+            return Err(ReadBreadError::BadPayload(tag));
+        }
         // Streamed, not preallocated from the recorded length: a damaged
         // length cannot ask for more memory than the payload really holds.
         let mut payload = Vec::new();
@@ -196,6 +199,17 @@ impl<R: Read> BreadReader<R> {
         }))
     }
 }
+
+/// Whether `stored` is exactly one Zstandard frame, not a skippable one, with
+/// nothing after it (`SPEC.md`, section 4.3). The stream decoder alone would
+/// also read several frames in a row, and skip skippable ones.
+fn is_one_frame(stored: &[u8]) -> bool {
+    stored.starts_with(&ZSTD_MAGIC)
+        && zstd::zstd_safe::find_frame_compressed_size(stored) == Ok(stored.len())
+}
+
+/// The first four bytes of a Zstandard frame that holds data.
+const ZSTD_MAGIC: [u8; 4] = [0x28, 0xb5, 0x2f, 0xfd];
 
 /// Reads until `buf` is full or the input ends; returns the bytes read.
 fn read_fully(input: &mut impl Read, buf: &mut [u8]) -> io::Result<usize> {

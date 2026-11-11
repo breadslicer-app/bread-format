@@ -1011,6 +1011,14 @@ const INVALID: &[Invalid] = &[
         bytes: wrong_raw_length,
     },
     Invalid {
+        name: "two-frames",
+        description: "The triangle file with the scene chunk stored as two Zstandard frames in a \
+                      row, which decompress to its payload but are not one frame.",
+        reason: "bad-payload",
+        chunk: Some(SCENE_TAG),
+        bytes: two_frames,
+    },
+    Invalid {
         name: "huge-raw-length",
         description: "The triangle file with the raw length of the mesh chunk set to 2^63: a \
                       reader that allocates it up front asks for 8 EiB.",
@@ -1206,6 +1214,19 @@ fn crc_mismatch() -> Vec<u8> {
 fn wrong_raw_length() -> Vec<u8> {
     let mut file = RawFile::triangle();
     file.chunk(SCENE_TAG).raw_len += 1;
+    file.bytes()
+}
+
+fn two_frames() -> Vec<u8> {
+    let mut file = RawFile::triangle();
+    let chunk = file.chunk(SCENE_TAG);
+    let payload = zstd::decode_all(chunk.stored.as_slice()).expect("the scene decompresses");
+    let (first, second) = payload.split_at(payload.len() / 2);
+    chunk.stored = [first, second]
+        .iter()
+        .flat_map(|half| zstd::bulk::compress(half, 3).expect("a half compresses"))
+        .collect();
+    chunk.crc = crc32fast::hash(&chunk.stored);
     file.bytes()
 }
 

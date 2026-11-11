@@ -172,7 +172,8 @@ Offsets count from the start of the chunk, and the next chunk starts right after
 ### 4.3 Stored bytes and checksum
 
 The stored bytes are one Zstandard frame ([RFC 8878](https://www.rfc-editor.org/rfc/rfc8878)) that
-decompresses to the payload.
+decompresses to the payload, and nothing else: not several frames in a row, not a skippable frame,
+and no bytes after the frame. So the stored bytes start with the frame magic `28 B5 2F FD`.
 
 - A writer MUST NOT write a frame that needs a dictionary.
 - A writer SHOULD NOT write a frame whose window is larger than 8 MB. RFC 8878 recommends that
@@ -199,7 +200,7 @@ then skips the chunk, refuses the file, or decompresses the payload, as the tabl
 | a CRC that does not match the stored bytes, in any chunk | refuse the file: it is damaged |
 | a tag it does not know | skip the chunk and go on |
 | a tag it knows, at a chunk version newer than the ones it supports | refuse the file |
-| stored bytes of a chunk it reads that are not a valid frame, or that do not decompress to exactly the raw length | refuse the file: it is damaged |
+| stored bytes of a chunk it reads that are not exactly one valid frame ([4.3](#43-stored-bytes-and-checksum)), or that do not decompress to exactly the raw length | refuse the file: it is damaged |
 
 A reader need not decompress a chunk it skips. If it does, and the stored bytes fail as in the last
 row, it MAY refuse the file, since no writer writes such a chunk.

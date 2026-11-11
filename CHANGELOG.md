@@ -4,6 +4,13 @@ What changes in each release of the `bread-format` crate. The format itself is d
 [SPEC.md](SPEC.md), which is still a draft: until version 1 of the format is frozen, a release may
 read files of an older release differently, and each release says how.
 
+## Unreleased
+
+- **Stored bytes must be exactly one Zstandard frame** (`SPEC.md`, section 4.3). The reader used to
+  accept several frames in a row, or a frame followed by a skippable one, as long as they
+  decompressed to the raw length; such a chunk is now refused as a bad payload, as the spec always
+  said. No file written by this crate has one. New conformance file: `invalid/two-frames`.
+
 ## 0.3.0 (2026-11-11)
 
 For use as a git dependency by tag, like 0.2.0. Files open and are written exactly as in 0.2.0,
