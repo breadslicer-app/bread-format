@@ -22,7 +22,7 @@ const bread = await load(readFileSync(wasm));
 
 /** The reasons a container reader gives on its own. */
 const CONTAINER_REASONS = ['not-bread', 'version', 'cut-short', 'crc', 'bad-payload'];
-const KNOWN = ['THMB', 'SCNE', 'PROJ', 'SUPP', 'HOLW', 'MESH', 'SPRV'];
+const KNOWN = ['THMB', 'SCNE', 'PROJ', 'SUPP', 'HOLW', 'SURF', 'MESH', 'SPRV'];
 
 function cases(dir) {
 	const names = readdirSync(join(conformance, dir))
@@ -56,6 +56,7 @@ for (const { name, bytes, json } of cases('valid')) {
 		assert.equal(count('SUPP'), json.supports.length > 0 ? 1 : 0);
 		assert.equal(count('HOLW'), json.hollows.length > 0 ? 1 : 0);
 		assert.equal(count('SPRV'), json.support_previews.length > 0 ? 1 : 0);
+		assert.equal(count('SURF'), json.surface.length > 0 ? 1 : 0);
 		assert.deepEqual(carried(chunks, 'PROJ'), json.settings);
 		assert.deepEqual(carried(chunks, 'THMB'), json.thumbnail);
 	});

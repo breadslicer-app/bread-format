@@ -26,10 +26,10 @@ use std::path::{Path, PathBuf};
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, DecodeMeshError, DecodeSceneError, HollowEntry,
     MESH_TAG, Mesh, Meta, Node, NodeKind, ReadBreadError, ReadFileError, SCENE_TAG,
-    SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, THUMBNAIL_TAG, Transform,
-    encode_mesh, read_file, write_file,
+    SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry, THUMBNAIL_TAG,
+    Transform, encode_mesh, read_file, write_file,
 };
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha384};
 
 /// A conformance file: its name, what it shows, and what it holds.
 struct Case {
@@ -115,6 +115,14 @@ const CASES: &[Case] = &[
         file: support_preview,
         skipped: &[],
     },
+    Case {
+        name: "surface-paint",
+        description: "The cube with paint on its faces: detail on its first two triangles, and \
+                      supports kept off two triangles at half strength. Each mask names the cube \
+                      by its fingerprint.",
+        file: surface_paint,
+        skipped: &[],
+    },
 ];
 
 /// A PNG of 2 x 2 pixels, 8-bit RGBA: crust brown and crumb on top, crumb
@@ -188,6 +196,56 @@ fn rotated_triangle() -> BreadFile {
 
 fn cube() -> BreadFile {
     one_leaf(named("cube scene"), named("cube"), cube_mesh("cube mesh"))
+}
+
+/// The SHA-384 fingerprint of `mesh` (`SPEC.md`, section 10.1).
+fn fingerprint(mesh: &Mesh) -> [u8; 48] {
+    let mut hasher = Sha384::new();
+    hasher.update((mesh.vertices.len() as u64).to_le_bytes());
+    for vertex in &mesh.vertices {
+        for coordinate in vertex {
+            hasher.update(coordinate.to_bits().to_le_bytes());
+        }
+    }
+    hasher.update((mesh.triangles.len() as u64).to_le_bytes());
+    for triangle in &mesh.triangles {
+        for index in triangle {
+            hasher.update(index.to_le_bytes());
+        }
+    }
+    hasher.finalize().into()
+}
+
+/// A version 1 paint document for `mesh`, from its runs.
+fn mask(mesh: &Mesh, runs: &[(u32, u8)]) -> Vec<u8> {
+    let mut document = (mesh.triangles.len() as u32).to_le_bytes().to_vec();
+    document.extend(fingerprint(mesh));
+    document.extend((runs.len() as u32).to_le_bytes());
+    for &(length, value) in runs {
+        document.extend(length.to_le_bytes());
+        document.push(value);
+    }
+    document
+}
+
+fn surface_paint() -> BreadFile {
+    let file = cube();
+    let mesh = &file.scene.meshes[0];
+    let surface = vec![
+        SurfaceEntry {
+            leaf: 0,
+            kind: 0,
+            version: 1,
+            document: mask(mesh, &[(2, 255), (10, 0)]),
+        },
+        SurfaceEntry {
+            leaf: 0,
+            kind: 2,
+            version: 1,
+            document: mask(mesh, &[(4, 0), (2, 128), (6, 0)]),
+        },
+    ];
+    BreadFile { surface, ..file }
 }
 
 fn two_parts() -> BreadFile {
@@ -275,6 +333,7 @@ fn slicer_data() -> BreadFile {
         }],
         thumbnail: None,
         support_previews: Vec::new(),
+        surface: Vec::new(),
     }
 }
 
@@ -583,6 +642,15 @@ fn describe(description: &str, file: &BreadFile) -> String {
             ("mesh", mesh(&preview.mesh)),
         ])
     });
+    let surface = file.surface.iter().map(|entry| {
+        Json::Object(vec![
+            ("leaf", Json::index(entry.leaf)),
+            ("kind", Json::int(u32::from(entry.kind))),
+            ("version", Json::int(entry.version)),
+            ("document_size", Json::index(entry.document.len())),
+            ("document_sha256", sha256(entry.document.iter().copied())),
+        ])
+    });
     let json = Json::Object(vec![
         ("description", Json::text(description)),
         ("meta", meta(scene.meta.as_ref())),
@@ -599,6 +667,7 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ("hollows", Json::List(hollows.collect())),
         ("thumbnail", payload(file.thumbnail.as_deref())),
         ("support_previews", Json::List(previews.collect())),
+        ("surface", Json::List(surface.collect())),
     ]);
     let mut out = String::new();
     json.write(&mut out, 0);

@@ -4,9 +4,9 @@
  */
 
 //! A whole `.bread` file: the thumbnail when there is one, the scene chunk,
-//! the project settings, the supports and the hollows when there are any, then
-//! one mesh chunk per mesh of the scene, in its order, and last the support
-//! previews when there are any.
+//! the project settings, the supports, the hollows and the surface paint when
+//! there are any, then one mesh chunk per mesh of the scene, in its order, and
+//! last the support previews when there are any.
 //!
 //! Reading skips the chunks this build does not know, official or private,
 //! and writing leaves them out, as section 7.2 allows. It also skips supports
@@ -33,6 +33,10 @@ use crate::preview::{
 };
 use crate::scene::{
     DecodeSceneError, EncodeSceneError, SCENE_TAG, SCENE_VERSION, Scene, decode_scene, encode_scene,
+};
+use crate::surface::{
+    DecodeSurfaceError, EncodeSurfaceError, SURFACE_TAG, SURFACE_VERSION, SurfaceEntry,
+    decode_surface, encode_surface,
 };
 
 /// The tag of the thumbnail chunk, whose payload is a PNG file. Section 8
@@ -63,6 +67,9 @@ pub struct BreadFile {
     /// `supports`. A program that edits the supports writes new previews, or
     /// none.
     pub support_previews: Vec<SupportPreview>,
+    /// What was painted on the faces of leaves: one mask per leaf and kind,
+    /// each document carried without being read.
+    pub surface: Vec<SurfaceEntry>,
 }
 
 /// Why a file could not be written.
@@ -74,6 +81,7 @@ pub enum WriteFileError {
     Supports(EncodeDocumentsError),
     Hollows(EncodeDocumentsError),
     Previews(EncodePreviewsError),
+    Surface(EncodeSurfaceError),
     /// A support leaf shows a mesh with vertices or triangles: support
     /// leaves are stored with an empty mesh.
     SupportMeshNotEmpty {
@@ -97,6 +105,7 @@ impl fmt::Display for WriteFileError {
             Self::Mesh(err) => write!(f, "{err}"),
             Self::Supports(err) | Self::Hollows(err) => write!(f, "{err}"),
             Self::Previews(err) => write!(f, "{err}"),
+            Self::Surface(err) => write!(f, "{err}"),
             Self::SupportMeshNotEmpty { leaf } => {
                 write!(
                     f,
@@ -140,6 +149,7 @@ pub enum ReadFileError {
     Supports(DecodeDocumentsError),
     Hollows(DecodeDocumentsError),
     Previews(DecodePreviewsError),
+    Surface(DecodeSurfaceError),
     /// A support leaf is also a hollowed model.
     SupportIsHollowed {
         leaf: usize,
@@ -168,6 +178,7 @@ impl fmt::Display for ReadFileError {
             Self::Scene(err) => write!(f, "{err}"),
             Self::Supports(err) | Self::Hollows(err) => write!(f, "{err}"),
             Self::Previews(err) => write!(f, "{err}"),
+            Self::Surface(err) => write!(f, "{err}"),
             Self::SupportIsHollowed { leaf } => write!(f, "{}", SupportIsHollowed(*leaf)),
             Self::PreviewWithoutSupports { leaf } => {
                 write!(f, "{}", PreviewWithoutSupports(*leaf))
@@ -219,6 +230,7 @@ pub fn supported_version(tag: ChunkTag) -> Option<u16> {
         HOLLOWS_TAG => HOLLOWS_VERSION,
         MESH_TAG => MESH_VERSION,
         SUPPORT_PREVIEW_TAG => SUPPORT_PREVIEW_VERSION,
+        SURFACE_TAG => SURFACE_VERSION,
         _ => return None,
     })
 }
@@ -232,6 +244,7 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     let hollows = encode_hollows(&file.hollows, scene).map_err(WriteFileError::Hollows)?;
     let previews =
         encode_previews(&file.support_previews, scene).map_err(WriteFileError::Previews)?;
+    let surface = encode_surface(&file.surface, scene).map_err(WriteFileError::Surface)?;
     for entry in &file.supports {
         let leaf = entry.support;
         if scene
@@ -262,6 +275,9 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     if !file.hollows.is_empty() {
         writer.chunk(HOLLOWS_TAG, HOLLOWS_VERSION, &hollows)?;
     }
+    if !file.surface.is_empty() {
+        writer.chunk(SURFACE_TAG, SURFACE_VERSION, &surface)?;
+    }
     for mesh in &scene.meshes {
         let payload = encode_mesh(mesh).map_err(WriteFileError::Mesh)?;
         writer.chunk(MESH_TAG, MESH_VERSION, &payload)?;
@@ -283,6 +299,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         Vec::new(),
         Vec::new(),
     );
+    let mut surfaces = Vec::new();
     let mut meshes = Vec::new();
     while let Some(chunk) = reader.next_chunk()? {
         let Some(supported) = supported_version(chunk.tag) else {
@@ -304,6 +321,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
             SUPPORTS_TAG => supports.push(current.then_some(chunk.payload)),
             HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
             SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
+            SURFACE_TAG => surfaces.push(chunk.payload),
             _ => meshes.push(decode_mesh(&chunk.payload).map_err(ReadFileError::Mesh)?),
         }
     }
@@ -318,6 +336,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     let supports = supports.flatten();
     let hollows = single(HOLLOWS_TAG, hollows)?.flatten();
     let previews = single(SUPPORT_PREVIEW_TAG, previews)?;
+    let surface = single(SURFACE_TAG, surfaces)?;
 
     let scene = decode_scene(&scene, meshes).map_err(ReadFileError::Scene)?;
     let supports = match supports {
@@ -340,6 +359,10 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
     if let Some(leaf) = unsupported_preview(&support_previews, &supports) {
         return Err(ReadFileError::PreviewWithoutSupports { leaf });
     }
+    let surface = match surface {
+        None => Vec::new(),
+        Some(payload) => decode_surface(&payload, &scene).map_err(ReadFileError::Surface)?,
+    };
     Ok(BreadFile {
         scene,
         settings,
@@ -347,6 +370,7 @@ pub fn read_file<R: Read>(input: R) -> Result<BreadFile, ReadFileError> {
         hollows,
         thumbnail,
         support_previews,
+        surface,
     })
 }
 

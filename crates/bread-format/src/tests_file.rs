@@ -17,8 +17,10 @@ use crate::preview::{
     DecodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, SupportPreview,
 };
 use crate::scene::{DecodeSceneError, SCENE_TAG, SCENE_VERSION};
+use crate::surface::{SURFACE_TAG, SURFACE_VERSION, SurfaceEntry};
 use crate::tests_preview::preview;
 use crate::tests_scene::scene;
+use crate::tests_surface::paint;
 
 fn supports(model: usize, support: usize, text: &str) -> SupportEntry {
     SupportEntry {
@@ -45,7 +47,7 @@ fn hollow(model: usize, original: usize, text: &str) -> HollowEntry {
 const THUMBNAIL: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
 
 /// The test scene with a thumbnail and settings, and a hollowed model with
-/// supports shown by the leaf with an empty mesh, and their preview.
+/// supports shown by the leaf with an empty mesh, their preview, and paint.
 fn file() -> BreadFile {
     BreadFile {
         scene: scene(),
@@ -54,6 +56,7 @@ fn file() -> BreadFile {
         hollows: vec![hollow(1, 0, "settings and drains")],
         thumbnail: Some(THUMBNAIL.to_vec()),
         support_previews: vec![preview()],
+        surface: vec![paint(0, 0), paint(1, 1), paint(1, 2)],
     }
 }
 
@@ -115,6 +118,7 @@ fn chunks_come_in_order() {
             SETTINGS_TAG,
             SUPPORTS_TAG,
             HOLLOWS_TAG,
+            SURFACE_TAG,
             MESH_TAG,
             MESH_TAG,
             MESH_TAG,
@@ -144,6 +148,7 @@ fn supported_versions_are_the_ones_written() {
         (HOLLOWS_TAG, HOLLOWS_VERSION),
         (MESH_TAG, MESH_VERSION),
         (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
+        (SURFACE_TAG, SURFACE_VERSION),
     ] {
         assert_eq!(supported_version(tag), Some(version), "{tag}");
     }
@@ -175,6 +180,7 @@ fn a_newer_version_or_version_0_is_refused() {
         (HOLLOWS_TAG, HOLLOWS_VERSION),
         (MESH_TAG, MESH_VERSION),
         (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
+        (SURFACE_TAG, SURFACE_VERSION),
     ] {
         for bad in [0, supported + 1] {
             let changed = rewrite(&bytes, |t, version, payload| {
@@ -408,4 +414,42 @@ fn a_reader_that_skips_the_preview_sees_the_same_file() {
             ..file
         }
     );
+}
+
+#[test]
+fn a_reader_that_skips_the_paint_sees_the_same_file() {
+    let file = file();
+    let back = read_file(without(&write(&file), SURFACE_TAG).as_slice()).unwrap();
+    assert_eq!(
+        back,
+        BreadFile {
+            surface: Vec::<SurfaceEntry>::new(),
+            ..file
+        }
+    );
+}
+
+#[test]
+fn paint_on_a_part_that_is_not_a_leaf_is_refused() {
+    let mut file = file();
+    file.surface.push(paint(3, 0));
+    assert!(matches!(
+        write_file(&file, Vec::new()),
+        Err(WriteFileError::Surface(_))
+    ));
+}
+
+#[test]
+fn two_paint_chunks_are_refused() {
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        let copies = if tag == SURFACE_TAG { 2 } else { 1 };
+        vec![(tag, version, payload); copies]
+    });
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::ChunkCount {
+            tag: SURFACE_TAG,
+            count: 2
+        })
+    ));
 }
