@@ -28,9 +28,9 @@ use crate::{Refusal, decode_mesh_chunk, decode_scene_chunk, read_chunks};
 
 thread_local! {
     static CHUNKS: RefCell<Vec<Chunk>> = const { RefCell::new(Vec::new()) };
-    static MESH: RefCell<Option<Mesh>> = const { RefCell::new(None) };
+    pub(crate) static MESH: RefCell<Option<Mesh>> = const { RefCell::new(None) };
     static SCENE: RefCell<Option<DecodedScene>> = const { RefCell::new(None) };
-    static REFUSAL: Cell<Option<Refusal>> = const { Cell::new(None) };
+    pub(crate) static REFUSAL: Cell<Option<Refusal>> = const { Cell::new(None) };
 }
 
 /// A decoded scene, with each node's transform laid out as JavaScript reads
@@ -181,13 +181,15 @@ pub unsafe extern "C" fn bread_decode_scene(
     u32::from(refusal.is_none())
 }
 
-/// Drops every result kept.
+/// Drops every result kept, and the file being written.
 #[unsafe(no_mangle)]
 pub extern "C" fn bread_release() {
     CHUNKS.set(Vec::new());
     MESH.set(None);
     SCENE.set(None);
     REFUSAL.set(None);
+    #[cfg(feature = "write")]
+    crate::write_abi::release();
 }
 
 /// How many chunks the last read returned.

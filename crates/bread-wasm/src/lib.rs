@@ -11,13 +11,28 @@
 //! lists a file's chunks, [`decode_mesh_chunk`] decodes a mesh chunk, and
 //! [`decode_scene_chunk`] the scene chunk. [`abi`] puts them behind a small C
 //! ABI that the JavaScript package calls.
+//!
+//! With the `write` feature, `read_stl_mesh` reads an STL and `write_bread`
+//! writes a file, behind [`write_abi`]. Writing takes zstd's compressor and
+//! meshoptimizer's encoders, which more than double the module, so the
+//! JavaScript package builds it twice: `bread.wasm` reads, and
+//! `bread-write.wasm` also writes.
 
+#[cfg(feature = "write")]
+use bread_format::{
+    BreadFile, EncodeMeshError, EncodeSceneError, ReadStlError, WriteFileError, read_stl,
+    write_file,
+};
 use bread_format::{
     BreadReader, Chunk, ChunkTag, DecodeMeshError, MESH_TAG, Mesh, ReadBreadError, SCENE_TAG,
     Scene, decode_mesh, decode_mesh_v2, decode_scene, supported_version,
 };
 
 pub mod abi;
+#[cfg(all(feature = "write", target_family = "wasm"))]
+mod cxx;
+#[cfg(feature = "write")]
+pub mod write_abi;
 
 /// Why a file was refused: a reason code of `conformance/README.md`, and the
 /// chunk it is about, when it is about one.
@@ -90,6 +105,53 @@ pub fn decode_scene_chunk(
     // the payload claims, so these placeholders cost what the file does. A
     // scene that names another number of meshes is malformed (SPEC.md, 5.1).
     decode_scene(payload, vec![Mesh::default(); mesh_count]).map_err(|_| refused("malformed"))
+}
+
+#[cfg(feature = "write")]
+/// The mesh of an STL file, binary or ASCII, as [`read_stl`] reads it.
+/// Refused as `not-stl`, `bad-stl` (an ASCII STL that breaks its grammar) or
+/// `too-large`, about no chunk.
+pub fn read_stl_mesh(bytes: &[u8]) -> Result<Mesh, Refusal> {
+    read_stl(bytes).map_err(|err| Refusal {
+        reason: match err {
+            ReadStlError::NotStl => "not-stl",
+            ReadStlError::Ascii { .. } => "bad-stl",
+            ReadStlError::TooLarge => "too-large",
+        },
+        chunk: None,
+    })
+}
+
+#[cfg(feature = "write")]
+/// A `.bread` file of `meshes` and the scene that places them, given as a
+/// scene chunk payload over them (`SPEC.md`, section 5). The payload is
+/// decoded first, with every check a reader makes, so a scene a reader would
+/// refuse is refused here as `malformed`, and never written. A mesh is
+/// refused as `no-such-vertex` when a triangle names a vertex it does not
+/// have, and as `too-large` past what a mesh chunk holds.
+pub fn write_bread(meshes: Vec<Mesh>, scene_payload: &[u8]) -> Result<Vec<u8>, Refusal> {
+    let scene = decode_scene(scene_payload, meshes).map_err(|_| Refusal {
+        reason: "malformed",
+        chunk: Some(SCENE_TAG),
+    })?;
+    let file = BreadFile {
+        scene,
+        ..BreadFile::default()
+    };
+    write_file(&file, Vec::new()).map_err(|err| {
+        let (reason, chunk) = match err {
+            WriteFileError::Mesh(EncodeMeshError::VertexOutOfRange) => ("no-such-vertex", MESH_TAG),
+            WriteFileError::Mesh(_) => ("too-large", MESH_TAG),
+            WriteFileError::Scene(EncodeSceneError::TooLarge) => ("too-large", SCENE_TAG),
+            // The scene was decoded with every check above, and the file
+            // holds nothing else.
+            _ => ("malformed", SCENE_TAG),
+        };
+        Refusal {
+            reason,
+            chunk: Some(chunk),
+        }
+    })
 }
 
 fn refusal(err: ReadBreadError) -> Refusal {

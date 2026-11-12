@@ -1,13 +1,14 @@
 {
   "name": "bread-format",
   "version": "0.1.0",
-  "description": "Reads .bread files in JavaScript, through the bread-format crate built to WebAssembly.",
+  "description": "Reads and writes .bread files in JavaScript, through the bread-format crate built to WebAssembly.",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./bread.wasm": "./dist/bread.wasm"
+    "./bread.wasm": "./dist/bread.wasm",
+		"./bread-write.wasm": "./dist/bread-write.wasm"
   },
   "scripts": {
     "build": "node build.mjs",
