@@ -36,6 +36,33 @@ jobs:
       - run: cargo +stable clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo +stable test --workspace --all-features
 
+  # The JavaScript package: the crate built to WebAssembly, both modules,
+  # against the conformance files. The build is the same on every platform,
+  # so Linux is enough. Node is the runner's own.
+  js:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WASI_SDK_PATH: ${{ github.workspace }}/.wasi-sdk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      # A clang that targets WebAssembly, for zstd and meshoptimizer, which
+      # are C and C++. Pinned by its hash.
+      - name: WebAssembly SDK
+        run: |
+          curl -sSfL -o wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz
+          echo "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4  wasi-sdk.tar.gz" | sha256sum -c -
+          mkdir -p "$WASI_SDK_PATH"
+          tar -xzf wasi-sdk.tar.gz -C "$WASI_SDK_PATH" --strip-components=1
+          rm wasi-sdk.tar.gz
+      - run: node --version
+      - run: npm run build
+        working-directory: bindings/js
+      - run: npm test
+        working-directory: bindings/js
+
   # The second reader, written from SPEC.md alone, against the conformance
   # files. Plain Python with no dependencies, so Linux is enough.
   python:
