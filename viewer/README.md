@@ -14,6 +14,8 @@ WebAssembly, so it makes the same checks as every other reader.
   mesh is compared with what was read from its STL, and every corner of a binary STL with the STL's
   own bytes, bit for bit. Then the page opens it, so what is shown is what was written, and offers
   it to download with its size before and after.
+- **Parts:** every leaf shown, with its name, its triangles and its size in millimetres in world
+  positions; each can be shown or hidden, and lights up in amber while the pointer is over it.
 - `?file=name.bread` in the address opens a file served next to the page, for links to examples.
 
 The page is in English, and in Spanish for a browser that asks for it.
@@ -30,7 +32,7 @@ The page is in English, and in Spanish for a browser that asks for it.
 
 It has no dependencies. The reading module (`bread.wasm`, about 73 KB with brotli) loads with the
 page; the writing module (`bread-write.wasm`, about 171 KB) only when STL files first come in.
-`src/convert.js` is the converter's part of the page.
+`src/convert.js` is the converter's part of the page, and `src/parts.js` the parts panel.
 
 ## Building and trying it
 

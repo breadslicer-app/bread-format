@@ -246,6 +246,68 @@ canvas:active {
 	text-decoration: none;
 }
 
+.section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--text-muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.link:hover {
+	color: var(--text);
+	text-decoration: underline;
+}
+
+.parts {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.parts li {
+	border-radius: var(--radius);
+}
+
+.parts li:hover {
+	background: var(--hover);
+}
+
+.part {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 2px 8px;
+	padding: 5px 6px;
+	cursor: pointer;
+}
+
+.part input {
+	grid-row: span 2;
+	accent-color: var(--accent);
+}
+
+.part-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.part-detail {
+	grid-column: 2 / 4;
+	color: var(--text-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
 .drop {
 	position: fixed;
 	inset: 0;
