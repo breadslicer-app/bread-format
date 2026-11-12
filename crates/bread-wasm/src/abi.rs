@@ -5,7 +5,8 @@
 
 //! The C ABI the JavaScript package calls. JavaScript copies a file, or a
 //! chunk's payload, into memory from [`bread_alloc`], calls
-//! [`bread_read_chunks`], [`bread_decode_mesh`] or [`bread_decode_scene`],
+//! [`bread_read_chunks`], [`bread_decode_mesh`], [`bread_decode_scene`] or
+//! [`bread_decode_previews`],
 //! frees the input, and copies out what it needs through the accessors.
 //! Results are kept until the next call of the same kind, or
 //! [`bread_release`].
@@ -22,14 +23,15 @@
 
 use std::cell::{Cell, RefCell};
 
-use bread_format::{Chunk, Mesh, Meta, Node, NodeKind, Scene};
+use bread_format::{Chunk, Mesh, Meta, Node, NodeKind, Scene, SupportPreview};
 
-use crate::{Refusal, decode_mesh_chunk, decode_scene_chunk, read_chunks};
+use crate::{Refusal, decode_mesh_chunk, decode_previews_chunk, decode_scene_chunk, read_chunks};
 
 thread_local! {
     static CHUNKS: RefCell<Vec<Chunk>> = const { RefCell::new(Vec::new()) };
     pub(crate) static MESH: RefCell<Option<Mesh>> = const { RefCell::new(None) };
     static SCENE: RefCell<Option<DecodedScene>> = const { RefCell::new(None) };
+    static PREVIEWS: RefCell<Vec<SupportPreview>> = const { RefCell::new(Vec::new()) };
     pub(crate) static REFUSAL: Cell<Option<Refusal>> = const { Cell::new(None) };
 }
 
@@ -181,12 +183,79 @@ pub unsafe extern "C" fn bread_decode_scene(
     u32::from(refusal.is_none())
 }
 
+/// Decodes the support preview chunk payload of `version` in the `len` bytes
+/// at `ptr`, against the file's scene: the scene chunk payload of
+/// `scene_version` in the `scene_len` bytes at `scene`, and `mesh_count` bytes
+/// at `empty`, 1 for each mesh chunk with no vertices and no triangles and 0
+/// for the others. As [`decode_previews_chunk`] does. Returns 1 when the
+/// previews were read and 0 when they were refused.
+///
+/// # Safety
+///
+/// Each pointer points to its length in initialized bytes.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn bread_decode_previews(
+    version: u32,
+    ptr: *const u8,
+    len: usize,
+    scene_version: u32,
+    scene: *const u8,
+    scene_len: usize,
+    empty: *const u8,
+    mesh_count: usize,
+) -> u32 {
+    // SAFETY: the caller promises each length in readable bytes at its
+    // pointer.
+    let (payload, scene_payload, empty) = unsafe {
+        (
+            std::slice::from_raw_parts(ptr, len),
+            std::slice::from_raw_parts(scene, scene_len),
+            std::slice::from_raw_parts(empty, mesh_count),
+        )
+    };
+    let empty: Vec<bool> = empty.iter().map(|&b| b == 1).collect();
+    let version = u16::try_from(version).unwrap_or(u16::MAX);
+    let scene_version = u16::try_from(scene_version).unwrap_or(u16::MAX);
+    let (previews, refusal) =
+        match decode_previews_chunk(version, payload, scene_version, scene_payload, &empty) {
+            Ok(previews) => (previews, None),
+            Err(refusal) => (Vec::new(), Some(refusal)),
+        };
+    PREVIEWS.set(previews);
+    REFUSAL.set(refusal);
+    u32::from(refusal.is_none())
+}
+
+/// How many previews the last decoded support preview chunk holds.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_preview_count() -> usize {
+    PREVIEWS.with_borrow(Vec::len)
+}
+
+/// The support leaf preview `index` is of, as a node index.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_preview_leaf(index: usize) -> usize {
+    PREVIEWS.with_borrow(|previews| previews.get(index).map_or(0, |p| p.leaf))
+}
+
+/// Makes the mesh of preview `index` the one the mesh accessors give.
+/// Returns 1, or 0 when there is no such preview.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_preview_select(index: usize) -> u32 {
+    let mesh = PREVIEWS.with_borrow(|previews| previews.get(index).map(|p| p.mesh.clone()));
+    let found = mesh.is_some();
+    MESH.set(mesh);
+    u32::from(found)
+}
+
 /// Drops every result kept, and the file being written.
 #[unsafe(no_mangle)]
 pub extern "C" fn bread_release() {
     CHUNKS.set(Vec::new());
     MESH.set(None);
     SCENE.set(None);
+    PREVIEWS.set(Vec::new());
     REFUSAL.set(None);
     #[cfg(feature = "write")]
     crate::write_abi::release();

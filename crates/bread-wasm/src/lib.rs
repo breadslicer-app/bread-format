@@ -8,8 +8,9 @@
 //! other program.
 //!
 //! The functions here are plain Rust and tested natively: [`read_chunks`]
-//! lists a file's chunks, [`decode_mesh_chunk`] decodes a mesh chunk, and
-//! [`decode_scene_chunk`] the scene chunk. [`abi`] puts them behind a small C
+//! lists a file's chunks, [`decode_mesh_chunk`] decodes a mesh chunk,
+//! [`decode_scene_chunk`] the scene chunk, and [`decode_previews_chunk`] the
+//! support previews. [`abi`] puts them behind a small C
 //! ABI that the JavaScript package calls.
 //!
 //! With the `write` feature, `read_stl_mesh` reads an STL and `write_bread`
@@ -24,8 +25,9 @@ use bread_format::{
     write_file,
 };
 use bread_format::{
-    BreadReader, Chunk, ChunkTag, DecodeMeshError, MESH_TAG, Mesh, ReadBreadError, SCENE_TAG,
-    Scene, decode_mesh, decode_mesh_v2, decode_scene, supported_version,
+    BreadReader, Chunk, ChunkTag, DecodeMeshError, DecodePreviewsError, MESH_TAG, Mesh,
+    ReadBreadError, SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportPreview, decode_mesh,
+    decode_mesh_v2, decode_previews, decode_scene, supported_version,
 };
 
 pub mod abi;
@@ -105,6 +107,55 @@ pub fn decode_scene_chunk(
     // the payload claims, so these placeholders cost what the file does. A
     // scene that names another number of meshes is malformed (SPEC.md, 5.1).
     decode_scene(payload, vec![Mesh::default(); mesh_count]).map_err(|_| refused("malformed"))
+}
+
+/// The support previews in the payload of a support preview chunk of
+/// `version`, checked as `SPEC.md` 9.2 says against the file's scene: the
+/// scene chunk payload of `scene_version`, over mesh chunks of which
+/// `empty_meshes` says which hold no vertices and no triangles. A preview of
+/// a node that is not a leaf, of a leaf whose mesh is not empty, or of a leaf
+/// another preview names, refuses the file as `malformed`.
+pub fn decode_previews_chunk(
+    version: u16,
+    payload: &[u8],
+    scene_version: u16,
+    scene_payload: &[u8],
+    empty_meshes: &[bool],
+) -> Result<Vec<SupportPreview>, Refusal> {
+    if version != 1 {
+        return Err(Refusal {
+            reason: "version",
+            chunk: Some(SUPPORT_PREVIEW_TAG),
+        });
+    }
+    // The check only asks whether each mesh is empty: stand-ins that are, or
+    // hold one vertex, answer it as the real meshes do.
+    let stand_ins = empty_meshes
+        .iter()
+        .map(|&empty| Mesh {
+            vertices: if empty { Vec::new() } else { vec![[0.0; 3]] },
+            ..Mesh::default()
+        })
+        .collect();
+    let scene = match scene_version {
+        1 => decode_scene(scene_payload, stand_ins).map_err(|_| Refusal {
+            reason: "malformed",
+            chunk: Some(SCENE_TAG),
+        })?,
+        _ => {
+            return Err(Refusal {
+                reason: "version",
+                chunk: Some(SCENE_TAG),
+            });
+        }
+    };
+    decode_previews(payload, &scene).map_err(|err| Refusal {
+        reason: match err {
+            DecodePreviewsError::Mesh(DecodeMeshError::VertexOutOfRange) => "no-such-vertex",
+            _ => "malformed",
+        },
+        chunk: Some(SUPPORT_PREVIEW_TAG),
+    })
 }
 
 #[cfg(feature = "write")]

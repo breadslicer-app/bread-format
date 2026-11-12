@@ -58,6 +58,12 @@ computed in `f64`, ready for `Matrix4.fromArray` in three.js. A leaf inside a su
 each reference that reaches it. References can copy subtrees that copy subtrees, so a small file can
 ask for a great many leaves: past a million nodes walked, or `{ limit }`, it throws a `RangeError`.
 
+`decodePreviews(chunks, meshes)` returns the support previews ([`SPEC.md`, section
+9](../../SPEC.md#9-support-preview-sprv)): for each support leaf that has one, the leaf's node index
+and the mesh of its supports, in the leaf's own space, to draw wherever `placeMeshes` places that
+leaf. `meshes` are the file's meshes, as `decodeMesh` gives them, which section 9.2's checks need. It
+returns an empty list for a file without previews, and throws a `BreadError` for previews it refuses.
+
 ### Writing, with `bread-write.wasm`
 
 ```js

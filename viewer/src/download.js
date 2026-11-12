@@ -40,7 +40,9 @@ const base = () => (state.name ?? 'scene.bread').replace(/\.bread$/i, '');
 
 function stlOf(indices) {
 	const file = state.file;
-	return toBinaryStl(indices.map((i) => ({ mesh: file.meshes[file.placements[i].mesh], matrix: file.placements[i].matrix })));
+	// A support leaf's part is its preview, when the file has one.
+	const meshOf = (i) => (file.preview?.[i] >= 0 ? file.previews[file.preview[i]].mesh : file.meshes[file.placements[i].mesh]);
+	return toBinaryStl(indices.map((i) => ({ mesh: meshOf(i), matrix: file.placements[i].matrix })));
 }
 
 openListeners.push((file) => {

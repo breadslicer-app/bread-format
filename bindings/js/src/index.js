@@ -315,6 +315,49 @@ export class Bread {
 		}
 	}
 
+	/**
+	 * The support previews of a file (SPEC.md 9): for support leaves, which
+	 * are stored with an empty mesh, the mesh of the supports as they were
+	 * when the file was written, in the leaf's own space. Each is checked as
+	 * section 9.2 says against the file's scene and meshes. To show one,
+	 * draw its mesh wherever `placeMeshes` places its leaf.
+	 *
+	 * @param {{ tag: string, version: number, payload: Uint8Array }[]} chunks as `readChunks` gives them
+	 * @param {{ vertices: Float32Array, triangles: Uint32Array }[]} meshes the file's meshes, in order
+	 * @returns {{ leaf: number, mesh: { meta: Meta, vertices: Float32Array, triangles: Uint32Array } }[]}
+	 *   empty when the file has no preview
+	 * @throws {BreadError} when the previews are refused, or the file holds
+	 *   more than one preview chunk or not exactly one scene chunk
+	 */
+	decodePreviews(chunks, meshes) {
+		const found = chunks.filter((chunk) => chunk.tag === 'SPRV');
+		if (found.length === 0) return [];
+		if (found.length > 1) throw new BreadError('chunk-count', 'SPRV');
+		const scenes = chunks.filter((chunk) => chunk.tag === 'SCNE');
+		if (scenes.length !== 1) throw new BreadError('chunk-count', 'SCNE');
+		const x = this.#x;
+		const empty = Uint8Array.from(meshes, (m) => (m.vertices.length === 0 && m.triangles.length === 0 ? 1 : 0));
+		const read = this.#withInput(found[0].payload, (p, pLen) =>
+			this.#withInput(scenes[0].payload, (s, sLen) =>
+				this.#withInput(empty, (e, eLen) =>
+					x.bread_decode_previews(found[0].version, p, pLen, scenes[0].version, s, sLen, e, eLen),
+				),
+			),
+		);
+		try {
+			if (!read) throw this.#refusal();
+			const previews = [];
+			for (let i = 0, n = u32(x.bread_preview_count()); i < n; i++) {
+				const leaf = u32(x.bread_preview_leaf(i));
+				x.bread_preview_select(i);
+				previews.push({ leaf, mesh: this.#lastMesh() });
+			}
+			return previews;
+		} finally {
+			x.bread_release();
+		}
+	}
+
 	/** The mesh the module last decoded or read, copied out. */
 	#lastMesh() {
 		const x = this.#x;

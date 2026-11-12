@@ -25,6 +25,7 @@ const WORDS = {
 		vertices: 'Vertices',
 		asStl: 'As binary STL',
 		smaller: '{x}× smaller',
+		larger: '{x}× larger',
 		openedIn: 'Read in',
 		notBread: 'Only .bread and STL files open here.',
 		noWebgl: 'This browser cannot draw 3D (WebGL2): the file can still be read, but not shown.',
@@ -45,6 +46,7 @@ const WORDS = {
 		vertices: 'Vértices',
 		asStl: 'Como STL binario',
 		smaller: '{x}× más chico',
+		larger: '{x}× más grande',
 		openedIn: 'Leído en',
 		notBread: 'Acá solo se abren archivos .bread y STL.',
 		noWebgl: 'Este navegador no puede dibujar 3D (WebGL2): el archivo se puede leer, pero no mostrar.',
@@ -112,6 +114,8 @@ export function ask(message, transfer = []) {
 const $ = (id) => document.getElementById(id);
 
 let renderer = null;
+/** The renderer, or null where the browser cannot draw 3D. */
+export const view3d = () => renderer;
 try {
 	renderer = new Renderer($('view'));
 } catch {
@@ -163,7 +167,10 @@ function fileFacts(file) {
 		[t('parts'), number.format(file.placements.length)],
 		[t('triangles'), number.format(triangles)],
 		[t('vertices'), number.format(vertices)],
-		[t('asStl'), `${bytes(stl)} · ${t('smaller', { x: decimal.format(stl / file.size) })}`],
+		[
+			t('asStl'),
+			`${bytes(stl)} · ${stl >= file.size ? t('smaller', { x: decimal.format(stl / file.size) }) : t('larger', { x: decimal.format(file.size / stl) })}`,
+		],
 		[t('openedIn'), `${number.format(Math.round(file.ms))} ms`],
 	];
 	const dl = document.createElement('dl');
