@@ -227,6 +227,25 @@ canvas:active {
 	overflow-wrap: anywhere;
 }
 
+.check {
+	margin: 10px 0;
+	padding: 8px 10px;
+	border-radius: var(--radius);
+	background: var(--card);
+	border-left: 3px solid var(--success);
+	color: var(--text-soft);
+}
+
+.check.failed {
+	border-left-color: var(--danger);
+}
+
+.button.wide {
+	display: flex;
+	justify-content: center;
+	text-decoration: none;
+}
+
 .drop {
 	position: fixed;
 	inset: 0;

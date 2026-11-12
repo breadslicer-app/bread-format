@@ -9,6 +9,11 @@ WebAssembly, so it makes the same checks as every other reader.
   says, on a millimetre grid as the build plate, Z up. Drag to turn, right drag or shift to move,
   the wheel to zoom, a double click to frame everything. On a touch screen, one finger turns and two
   pinch and move.
+- **Convert** STL files, binary or ASCII, dropped or picked, into one `.bread` file: each STL a part
+  named after its file, where the STL put it. Before the file is offered it is read back, and every
+  mesh is compared with what was read from its STL, and every corner of a binary STL with the STL's
+  own bytes, bit for bit. Then the page opens it, so what is shown is what was written, and offers
+  it to download with its size before and after.
 - `?file=name.bread` in the address opens a file served next to the page, for links to examples.
 
 The page is in English, and in Spanish for a browser that asks for it.
@@ -24,7 +29,8 @@ The page is in English, and in Spanish for a browser that asks for it.
 | `src/core.js` | what is done with files, apart from the page, and tested in Node |
 
 It has no dependencies. The reading module (`bread.wasm`, about 73 KB with brotli) loads with the
-page.
+page; the writing module (`bread-write.wasm`, about 171 KB) only when STL files first come in.
+`src/convert.js` is the converter's part of the page.
 
 ## Building and trying it
 
