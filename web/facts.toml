@@ -294,6 +294,65 @@ what = "what the second reader needs besides the Python standard library (Python
 source = "python/pyproject.toml"
 date = 2026-11-11
 
+# --- The viewer and converter -----------------------------------------------------
+# notes/viewer.md. Hosted by the page at /viewer/, built from viewer/ on main.
+
+[tools.viewer]
+path = "/viewer/"
+source = "viewer/ on main: npm run build in bindings/js, then in viewer; viewer/dist is the whole page"
+runs = "in the browser only: files never leave the visitor's computer"
+languages = ["en", "es"]
+released = false                # true once the page serves it at /viewer/
+
+[facts.viewer_reader_kb]
+value = 73
+unit = "KB"
+what = "the WebAssembly module the viewer loads with the page, which reads, compressed with brotli"
+source = "bindings/js/dist/bread.wasm, 210,816 bytes, brotli at quality 11"
+date = 2026-11-12
+
+[facts.viewer_writer_kb]
+value = 171
+unit = "KB"
+what = "the module that also reads STL and writes .bread, loaded only when STL files come in, with brotli"
+source = "bindings/js/dist/bread-write.wasm, 661,716 bytes, brotli at quality 11"
+date = 2026-11-12
+
+[facts.viewer_convert_triangles]
+value = 1545076
+unit = "triangles"
+what = "triangles of the STL the viewer's conversion time uses: a figure of the MZ4250 corpus"
+source = "headless Edge, viewer of PR #115"
+date = 2026-11-12
+
+[facts.viewer_convert_stl_mb]
+value = 77.3
+unit = "MB"
+what = "that figure as binary STL"
+source = "same measurement"
+date = 2026-11-12
+
+[facts.viewer_convert_bread_mb]
+value = 6.2
+unit = "MB"
+what = "the .bread file the viewer made of it"
+source = "same measurement"
+date = 2026-11-12
+
+[facts.viewer_convert_s]
+value = 2.4
+unit = "s"
+what = "converting it in the browser, the bit-for-bit check of every corner included"
+source = "same measurement (2,378 ms)"
+date = 2026-11-12
+
+[facts.viewer_open_ms]
+value = 310
+unit = "ms"
+what = "opening the converted file in the viewer (308-325 ms)"
+source = "same measurement"
+date = 2026-11-12
+
 # --- A third implementation: Caliper, in C++ --------------------------------------
 # notes/caliper.md. In Caliper since its release 0.9.6.
 

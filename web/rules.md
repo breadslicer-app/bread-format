@@ -19,7 +19,9 @@ These rules come before everything else in `web/`. Each one says why.
    meshoptimizer (by Arseny Kapoulkine). The author's own programs are named: Breadslicer, and
    Caliper, a mesh repair program (`notes/caliper.md`). Rule 6 holds for them too: the page does
    not say a program supports `.bread` in a release until that release has happened.
-4. **No links to the repository.** It is private: a link would give the public a 404.
+4. **No links to the repository.** It is private: a link would give the public a 404. The viewer
+   is not a link but a copy: the page serves `viewer/dist`, built from `viewer/` on main, at
+   `/viewer/` (`notes/viewer.md`), with the `NOTICE` and `LICENSE` that come in that folder.
 5. **The specification as frozen, and nothing newer.** Version 1 is frozen (tag `spec-v1`), so the
    page may quote `SPEC.md` and show its layouts, such as tables of field offsets, and may offer the
    conformance files as downloads hosted on the page itself (rule 4 still holds). Only the text as
