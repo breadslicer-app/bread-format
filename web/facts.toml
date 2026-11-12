@@ -294,6 +294,60 @@ what = "what the second reader needs besides the Python standard library (Python
 source = "python/pyproject.toml"
 date = 2026-11-11
 
+# --- A third implementation: Caliper, in C++ --------------------------------------
+# notes/caliper.md. Done on Caliper's main, not yet in a release of Caliper.
+
+[implementations.caliper]
+program = "Caliper"
+what = "a mesh repair program by the same author as .bread"
+language = "C++"
+reads = true
+writes = true
+written_from = "the specification of version 1 alone"
+released = false                # true once a Caliper release ships it (rules.md, rule 6)
+
+[facts.caliper_conformance_platforms]
+value = 2
+unit = "platforms"
+what = "Caliper passes every conformance file, valid and invalid, on Windows and on Linux"
+source = "Caliper's tests"
+date = 2026-11-12
+
+[facts.caliper_spec_gaps]
+value = 0
+unit = "places"
+what = "places where Caliper's implementation found the specification of version 1 ambiguous"
+source = "Caliper's implementation, written from SPEC.md as of spec-v1"
+date = 2026-11-12
+
+[facts.caliper_model_triangles]
+value = 2400000
+unit = "triangles"
+what = "triangles, about, of the model Caliper's sizes use"
+source = "Caliper's measurement"
+date = 2026-11-12
+
+[facts.caliper_model_stl_mb]
+value = 121.8
+unit = "MB"
+what = "that model as binary STL"
+source = "Caliper's measurement"
+date = 2026-11-12
+
+[facts.caliper_model_bread_mb]
+value = 11.3
+unit = "MB"
+what = "that model as .bread, written by Caliper"
+source = "Caliper's measurement"
+date = 2026-11-12
+
+[facts.caliper_model_ratio]
+value = 10.7
+unit = "x"
+what = "how many times smaller Caliper's .bread file is than the binary STL"
+source = "Caliper's measurement"
+date = 2026-11-12
+
 # --- A public corpus: the miniatures of MZ4250 ------------------------------
 # Models by MZ4250, shared under CC BY 4.0, named by their file names.
 # data/mz4250-corpus.json has one row per model; notes/mz4250-corpus.md says
