@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-12, a third implementation
+
+- **Caliper** opens and saves `.bread`: a C++ implementation written from the specification alone.
+  It is in `notes/caliper.md`, in `[implementations.caliper]` and in the facts `caliper_*`. It is
+  not in a release of Caliper yet (`released = false`).
+- `rules.md`, rule 3: the author's own programs, Breadslicer and Caliper, are named.
+
 ## 2026-11-11, version 1 is frozen
 
 - `spec_status` is `"frozen"`: the tag `spec-v1` exists.

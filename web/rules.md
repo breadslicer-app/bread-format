@@ -16,7 +16,9 @@ These rules come before everything else in `web/`. Each one says why.
    test benches beyond what `web/` says.
 3. **No competing products.** Slicers and other products are not named. Other file formats are:
    STL, OBJ, 3MF, glTF. Libraries the format stands on are named with credit: Zstandard,
-   meshoptimizer (by Arseny Kapoulkine).
+   meshoptimizer (by Arseny Kapoulkine). The author's own programs are named: Breadslicer, and
+   Caliper, a mesh repair program (`notes/caliper.md`). Rule 6 holds for them too: the page does
+   not say a program supports `.bread` in a release until that release has happened.
 4. **No links to the repository.** It is private: a link would give the public a 404.
 5. **The specification as frozen, and nothing newer.** Version 1 is frozen (tag `spec-v1`), so the
    page may quote `SPEC.md` and show its layouts, such as tables of field offsets, and may offer the
