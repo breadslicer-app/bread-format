@@ -5,8 +5,14 @@ WebAssembly ([`crates/bread-wasm`](../../crates/bread-wasm)): one implementation
 checks as every other reader. It has no dependencies. It is not published yet; the package name
 is still to be settled.
 
-So far it reads: the container, the chunks of a file, each checked and decompressed; the meshes in
-them, `MESH` versions 1 and 2; and the scene that places them. Writing comes next.
+It reads the container, the chunks of a file, each checked and decompressed; the meshes in them,
+`MESH` versions 1 and 2; and the scene that places them. It also reads STL files and writes `.bread`
+files.
+
+The module comes built twice. `dist/bread.wasm` reads, and is about 73 KB with brotli.
+`dist/bread-write.wasm` also reads STL and writes `.bread`, and is about 171 KB, because it takes
+zstd's compressor and meshoptimizer's encoders. A page that only shows files loads the first; one
+that converts loads the second when it is needed. Both read the same way.
 
 ```js
 import { load, placeMeshes, BreadError } from 'bread-format';
@@ -51,6 +57,28 @@ index, the mesh it shows, and its world transform as a 4 × 4 matrix in column-m
 computed in `f64`, ready for `Matrix4.fromArray` in three.js. A leaf inside a subtree comes once for
 each reference that reaches it. References can copy subtrees that copy subtrees, so a small file can
 ask for a great many leaves: past a million nodes walked, or `{ limit }`, it throws a `RangeError`.
+
+### Writing, with `bread-write.wasm`
+
+```js
+const writer = await load(fetch(new URL('bread-write.wasm', import.meta.url)));
+// Each STL a part named after its file, in one .bread file.
+const { file } = writer.fromStl([{ name: 'arm.stl', bytes: armStl }, { name: 'base.stl', bytes: baseStl }]);
+```
+
+`readStl` reads a binary or ASCII STL into a mesh, as `decodeMesh` gives one. Two corners are one
+vertex when their coordinates are equal bit for bit, numbered by first use, so every corner of every
+triangle comes back exactly, in the STL's order. An ASCII STL's solid name becomes the mesh's name,
+and a binary header that holds text becomes its comment. It throws a `BreadError` with reason
+`not-stl`, `bad-stl` (an ASCII STL that breaks its grammar) or `too-large`.
+
+`writeFile(scene, meshes)` writes a file of meshes, as `decodeMesh` gives them, placed by a scene,
+as `decodeScene` gives one. The scene is checked as a reader checks it, so a scene a reader would
+refuse throws `malformed` and is never written. Coordinates are written bit for bit, and triangles
+in their order. `fromStl(files, { name })` does both for a list of STLs: each becomes a mesh shown
+by a leaf named after its file, where the STL put it.
+
+`canWrite` tells the modules apart; the writing methods throw a `TypeError` on `bread.wasm`.
 
 ## Building and testing
 

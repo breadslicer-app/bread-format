@@ -14,6 +14,10 @@ const MESSAGES = {
 	'bad-payload': 'a chunk does not decompress to its recorded length',
 	malformed: 'a chunk is malformed',
 	'no-such-vertex': 'a triangle names a vertex its mesh does not have',
+	'chunk-count': 'the file holds more or fewer chunks of a kind than the format allows',
+	'not-stl': 'not an STL file',
+	'bad-stl': 'the ASCII STL is malformed',
+	'too-large': 'too large for a .bread file',
 };
 
 /** A file the reader refused. */
@@ -53,6 +57,80 @@ export async function load(source) {
 }
 
 const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+
+/**
+ * A scene as a scene chunk payload (SPEC.md 5.1) over `meshCount` meshes.
+ * Each subtree record goes right after its root, or after the subtree before
+ * it when that comes later, as the reference implementation writes them. The
+ * module checks the payload as a reader does before it writes it.
+ *
+ * @param {Scene} scene
+ * @param {number} meshCount
+ * @returns {Uint8Array}
+ */
+function encodeScene(scene, meshCount) {
+	const out = [];
+	const u8 = (v) => out.push(v);
+	const u32v = (v) => {
+		if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new TypeError(`not an index: ${v}`);
+		out.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, v >>> 24);
+	};
+	const text = (s) => {
+		if (s === null || s === undefined) return u8(0);
+		const bytes = encoder.encode(s);
+		u8(1);
+		u32v(bytes.length);
+		for (const b of bytes) out.push(b);
+	};
+	const meta = (m) => {
+		if (m === null || m === undefined) return u8(0);
+		u8(1);
+		text(m.name);
+		text(m.comment);
+	};
+	const f64 = new DataView(new ArrayBuffer(8));
+	const transform = (t) => {
+		if (t === null || t === undefined) return u8(0);
+		u8(1);
+		for (const v of [...t.linear.flat(), ...t.translation]) {
+			f64.setFloat64(0, v, true);
+			for (let i = 0; i < 8; i++) out.push(f64.getUint8(i));
+		}
+	};
+	const list = (values) => {
+		u32v(values.length);
+		for (const v of values) u32v(v);
+	};
+	const KIND = { group: 0, leaf: 1, 'shared leaf': 2, reference: 4 };
+	const subtrees = scene.subtrees ?? [];
+
+	meta(scene.meta);
+	u32v(meshCount);
+	list(scene.meshResources ?? []);
+	u32v(scene.nodes.length + subtrees.length);
+	let next = 0;
+	for (const [listed, node] of scene.nodes.entries()) {
+		const kind = KIND[node.kind];
+		if (kind === undefined) throw new TypeError(`not a node kind: ${node.kind}`);
+		u8(kind);
+		meta(node.meta);
+		transform(node.transform);
+		if (node.kind === 'group') list(node.children);
+		else u32v(node.kind === 'leaf' ? node.mesh : node.kind === 'shared leaf' ? node.resource : node.subtree);
+		while (next < subtrees.length && subtrees[next] <= listed) {
+			u8(5);
+			u32v(subtrees[next++]);
+		}
+	}
+	// Subtrees whose roots are not nodes: the module refuses the payload.
+	while (next < subtrees.length) {
+		u8(5);
+		u32v(subtrees[next++]);
+	}
+	list(scene.roots);
+	return Uint8Array.from(out);
+}
 
 /** Where `bread_mesh_text_len` says a mesh has no such text. */
 const NO_TEXT = 0xffffffff;
@@ -231,26 +309,161 @@ export class Bread {
 		x.bread_free(input, bytes.length);
 		try {
 			if (!read) throw this.#refusal();
-			const text = (which) => {
-				const len = u32(x.bread_mesh_text_len(which));
-				if (len === NO_TEXT) return null;
-				return decoder.decode(new Uint8Array(x.memory.buffer, u32(x.bread_mesh_text(which)), len));
-			};
-			const meta = x.bread_mesh_has_meta() ? { name: text(0), comment: text(1) } : null;
-			const vertices = new Float32Array(
-				x.memory.buffer,
-				u32(x.bread_mesh_vertices()),
-				3 * u32(x.bread_mesh_vertex_count()),
-			).slice();
-			const triangles = new Uint32Array(
-				x.memory.buffer,
-				u32(x.bread_mesh_triangles()),
-				3 * u32(x.bread_mesh_triangle_count()),
-			).slice();
-			return { meta, vertices, triangles };
+			return this.#lastMesh();
 		} finally {
 			x.bread_release();
 		}
+	}
+
+	/** The mesh the module last decoded or read, copied out. */
+	#lastMesh() {
+		const x = this.#x;
+		const text = (which) => {
+			const len = u32(x.bread_mesh_text_len(which));
+			if (len === NO_TEXT) return null;
+			return decoder.decode(new Uint8Array(x.memory.buffer, u32(x.bread_mesh_text(which)), len));
+		};
+		const meta = x.bread_mesh_has_meta() ? { name: text(0), comment: text(1) } : null;
+		// slice() copies the bytes, so every coordinate keeps its bits.
+		const vertices = new Float32Array(
+			x.memory.buffer,
+			u32(x.bread_mesh_vertices()),
+			3 * u32(x.bread_mesh_vertex_count()),
+		).slice();
+		const triangles = new Uint32Array(
+			x.memory.buffer,
+			u32(x.bread_mesh_triangles()),
+			3 * u32(x.bread_mesh_triangle_count()),
+		).slice();
+		return { meta, vertices, triangles };
+	}
+
+	/** Whether this module writes: `bread-write.wasm` does, `bread.wasm` does not. */
+	get canWrite() {
+		return typeof this.#x.bread_write_begin === 'function';
+	}
+
+	#needWriter() {
+		if (!this.canWrite) throw new TypeError('this module only reads: load bread-write.wasm to write');
+	}
+
+	/**
+	 * Copies `bytes` into the module, calls `f` with where they are and how
+	 * many, and frees them. Even no bytes get a real pointer, as Rust needs.
+	 */
+	#withInput(bytes, f) {
+		const x = this.#x;
+		const at = u32(x.bread_alloc(bytes.length));
+		new Uint8Array(x.memory.buffer, at, bytes.length).set(bytes);
+		try {
+			return f(at, bytes.length);
+		} finally {
+			x.bread_free(at, bytes.length);
+		}
+	}
+
+	/**
+	 * An STL file, binary or ASCII, read into a mesh as `decodeMesh` gives
+	 * one. Two corners are one vertex when their coordinates are equal bit for
+	 * bit, numbered by first use, so every corner of every triangle comes back
+	 * exactly, in the STL's order. An ASCII STL's solid name is the mesh's
+	 * name, and a binary header that holds text its comment. Needs
+	 * `bread-write.wasm`.
+	 *
+	 * @param {Uint8Array} bytes the whole STL
+	 * @returns {{ meta: Meta, vertices: Float32Array, triangles: Uint32Array }}
+	 * @throws {BreadError} `not-stl`, `bad-stl` or `too-large`
+	 */
+	readStl(bytes) {
+		this.#needWriter();
+		const x = this.#x;
+		const read = this.#withInput(bytes, (at, len) => x.bread_read_stl(at, len));
+		try {
+			if (!read) throw this.#refusal();
+			return this.#lastMesh();
+		} finally {
+			x.bread_release();
+		}
+	}
+
+	/**
+	 * A `.bread` file of `meshes`, placed by `scene`: a scene as `decodeScene`
+	 * gives one, whose `meshCount`, if given, is ignored. The scene is
+	 * checked as a reader checks it, so a scene a reader would refuse is
+	 * refused here and never written. Coordinates are written bit for bit and
+	 * triangles in their order. Needs `bread-write.wasm`.
+	 *
+	 * @param {Scene} scene
+	 * @param {{ meta: Meta, vertices: Float32Array, triangles: Uint32Array }[]} meshes
+	 * @returns {Uint8Array} the file
+	 * @throws {BreadError} `malformed` for a scene or mesh it refuses,
+	 *   `no-such-vertex`, or `too-large`
+	 */
+	writeFile(scene, meshes) {
+		this.#needWriter();
+		const x = this.#x;
+		const utf8 = (s) => (s === null || s === undefined ? null : encoder.encode(s));
+		const bytesOf = (array) => new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+		try {
+			x.bread_write_begin();
+			for (const mesh of meshes) {
+				const meta = mesh.meta ?? null;
+				const name = meta === null ? null : utf8(meta.name);
+				const comment = meta === null ? null : utf8(meta.comment);
+				// A text pointer of 0 is no text; an empty text still needs one.
+				const added = this.#withInput(bytesOf(mesh.vertices), (v, vLen) =>
+					this.#withInput(bytesOf(mesh.triangles), (t, tLen) =>
+						this.#withText(name, (n, nLen) =>
+							this.#withText(comment, (c, cLen) =>
+								x.bread_write_mesh(v, vLen, t, tLen, meta === null ? 0 : 1, n, nLen, c, cLen),
+							),
+						),
+					),
+				);
+				if (!added) throw this.#refusal();
+			}
+			const payload = encodeScene(scene, meshes.length);
+			const written = this.#withInput(payload, (at, len) => x.bread_write_file(at, len));
+			if (!written) throw this.#refusal();
+			return new Uint8Array(x.memory.buffer, u32(x.bread_output()), u32(x.bread_output_len())).slice();
+		} finally {
+			x.bread_release();
+		}
+	}
+
+	/** As `#withInput`, but `null` is no text, given as pointer 0. */
+	#withText(bytes, f) {
+		if (bytes === null) return f(0, 0);
+		return this.#withInput(bytes, f);
+	}
+
+	/**
+	 * STL files as one `.bread` file: each STL a mesh, shown by a leaf named
+	 * after its file, in order, with no transform: they stay where the STLs
+	 * put them. Several STLs make a kit of parts in one file. Needs
+	 * `bread-write.wasm`.
+	 *
+	 * @param {{ name: string, bytes: Uint8Array }[]} files
+	 * @param {{ name?: string }} [options] a name for the scene
+	 * @returns {{ file: Uint8Array, meshes: { meta: Meta, vertices: Float32Array, triangles: Uint32Array }[] }}
+	 *   the `.bread` file, and the meshes read from the STLs
+	 * @throws {BreadError} for an STL it cannot read, as `readStl`
+	 */
+	fromStl(files, { name } = {}) {
+		const meshes = files.map((file) => this.readStl(file.bytes));
+		const scene = {
+			meta: name === undefined ? null : { name, comment: null },
+			meshResources: [],
+			nodes: files.map((file, mesh) => ({
+				kind: 'leaf',
+				meta: { name: file.name, comment: null },
+				transform: null,
+				mesh,
+			})),
+			subtrees: [],
+			roots: files.map((_, i) => i),
+		};
+		return { file: this.writeFile(scene, meshes), meshes };
 	}
 
 	/**

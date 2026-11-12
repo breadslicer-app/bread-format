@@ -11,6 +11,10 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Reading STL and writing .bread files: see src/lib.rs.
+write = []
+
 [dependencies]
 bread-format = { path = "../bread-format" }
 

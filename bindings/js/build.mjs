@@ -36,19 +36,27 @@ const include = `-include ${join(crate, 'wasm/meshopt-math.h').replaceAll('\\', 
 env.CFLAGS_wasm32_unknown_unknown = include;
 env.CXXFLAGS_wasm32_unknown_unknown = include;
 
-execFileSync(
-	'cargo',
-	['build', '-p', 'bread-wasm', '--profile', 'wasm', '--target', 'wasm32-unknown-unknown'],
-	{ cwd: root, env, stdio: 'inherit' },
-);
-
 const target = env.CARGO_TARGET_DIR ? resolve(root, env.CARGO_TARGET_DIR) : join(root, 'target');
 const built = join(target, 'wasm32-unknown-unknown/wasm/bread_wasm.wasm');
-if (!existsSync(built)) {
-	console.error(`cargo did not write ${built}`);
-	process.exit(1);
-}
 mkdirSync(join(here, 'dist'), { recursive: true });
-copyFileSync(built, join(here, 'dist/bread.wasm'));
+
+// Two modules: bread.wasm reads, and bread-write.wasm also reads STL and
+// writes .bread, which takes zstd's compressor and meshoptimizer's encoders
+// and more than doubles it. A page that only shows files loads the first.
+for (const [name, features] of [
+	['bread.wasm', []],
+	['bread-write.wasm', ['--features', 'write']],
+]) {
+	execFileSync(
+		'cargo',
+		['build', '-p', 'bread-wasm', '--profile', 'wasm', '--target', 'wasm32-unknown-unknown', ...features],
+		{ cwd: root, env, stdio: 'inherit' },
+	);
+	if (!existsSync(built)) {
+		console.error(`cargo did not write ${built}`);
+		process.exit(1);
+	}
+	copyFileSync(built, join(here, 'dist', name));
+	console.log(`wrote dist/${name}`);
+}
 copyFileSync(join(crate, 'NOTICE'), join(here, 'dist/NOTICE'));
-console.log('wrote dist/bread.wasm');
