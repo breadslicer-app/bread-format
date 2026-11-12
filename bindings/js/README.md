@@ -5,19 +5,21 @@ WebAssembly ([`crates/bread-wasm`](../../crates/bread-wasm)): one implementation
 checks as every other reader. It has no dependencies. It is not published yet; the package name
 is still to be settled.
 
-So far it reads the container, the chunks of a file, each checked and decompressed, and decodes
-the meshes in them, `MESH` versions 1 and 2. Reading the scene, and writing, come next.
+So far it reads: the container, the chunks of a file, each checked and decompressed; the meshes in
+them, `MESH` versions 1 and 2; and the scene that places them. Writing comes next.
 
 ```js
-import { load, BreadError } from 'bread-format';
+import { load, placeMeshes, BreadError } from 'bread-format';
 
 const bread = await load(fetch(new URL('bread.wasm', import.meta.url)));
 try {
-	for (const chunk of bread.readChunks(bytes)) {
-		if (chunk.tag !== 'MESH') continue;
-		// vertices: Float32Array of x, y, z; triangles: Uint32Array of indices.
-		const { meta, vertices, triangles } = bread.decodeMesh(chunk);
-		console.log(meta?.name, vertices.length / 3, triangles.length / 3);
+	const chunks = bread.readChunks(bytes);
+	// vertices: Float32Array of x, y, z; triangles: Uint32Array of indices.
+	const meshes = chunks.filter((chunk) => chunk.tag === 'MESH').map((chunk) => bread.decodeMesh(chunk));
+	const scene = bread.decodeScene(chunks);
+	for (const { leaf, mesh, matrix } of placeMeshes(scene)) {
+		// matrix: the leaf's world transform, 4 × 4 in column-major order.
+		console.log(scene.nodes[leaf].meta?.name, meshes[mesh].triangles.length / 3, matrix);
 	}
 } catch (err) {
 	if (err instanceof BreadError) console.log(err.reason, err.chunk);
@@ -35,6 +37,20 @@ chunk it is about, or `null`.
 triangles as three vertex indices each, first corner first, ready for a `BufferGeometry`.
 Coordinates come back bit for bit. It throws a `BreadError` with reason `malformed`,
 `no-such-vertex` or `version` for a mesh it refuses.
+
+`decodeScene` takes the chunks `readChunks` gives and returns the scene ([`SPEC.md`, section
+5](../../SPEC.md#5-scene-scne)) as it is stored: its metadata, `meshCount`, `meshResources`,
+`nodes`, `subtrees` and `roots`, which name meshes by their order among the `MESH` chunks. Each node
+has a `kind` (`'group'`, `'leaf'`, `'shared leaf'` or `'reference'`), its `meta`, its `transform`
+(`null` for the identity, or `linear`, three rows, and `translation`), and by kind its `children`,
+`mesh`, `resource` or `subtree`. It throws a `BreadError` with reason `chunk-count` when the file
+does not hold exactly one scene chunk, and `malformed` or `version` for a scene it refuses.
+
+`placeMeshes` walks a scene as section 5.4 says and returns every leaf it shows: the leaf's node
+index, the mesh it shows, and its world transform as a 4 × 4 matrix in column-major order,
+computed in `f64`, ready for `Matrix4.fromArray` in three.js. A leaf inside a subtree comes once for
+each reference that reaches it. References can copy subtrees that copy subtrees, so a small file can
+ask for a great many leaves: past a million nodes walked, or `{ limit }`, it throws a `RangeError`.
 
 ## Building and testing
 
