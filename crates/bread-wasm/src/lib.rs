@@ -8,12 +8,13 @@
 //! other program.
 //!
 //! The functions here are plain Rust and tested natively: [`read_chunks`]
-//! lists a file's chunks, and [`decode_mesh_chunk`] decodes a mesh chunk.
-//! [`abi`] puts them behind a small C ABI that the JavaScript package calls.
+//! lists a file's chunks, [`decode_mesh_chunk`] decodes a mesh chunk, and
+//! [`decode_scene_chunk`] the scene chunk. [`abi`] puts them behind a small C
+//! ABI that the JavaScript package calls.
 
 use bread_format::{
-    BreadReader, Chunk, ChunkTag, DecodeMeshError, MESH_TAG, Mesh, ReadBreadError, decode_mesh,
-    decode_mesh_v2, supported_version,
+    BreadReader, Chunk, ChunkTag, DecodeMeshError, MESH_TAG, Mesh, ReadBreadError, SCENE_TAG,
+    Scene, decode_mesh, decode_mesh_v2, decode_scene, supported_version,
 };
 
 pub mod abi;
@@ -67,6 +68,28 @@ pub fn decode_mesh_chunk(version: u16, payload: &[u8]) -> Result<Mesh, Refusal> 
             DecodeMeshError::VertexOutOfRange => "no-such-vertex",
         })
     })
+}
+
+/// The scene in the payload of a scene chunk of `version`, as [`read_chunks`]
+/// gives it, in a file of `mesh_count` mesh chunks. The scene names its
+/// meshes by index and holds none of them: its `meshes` are `mesh_count`
+/// empty ones, and [`decode_mesh_chunk`] decodes each.
+pub fn decode_scene_chunk(
+    version: u16,
+    payload: &[u8],
+    mesh_count: usize,
+) -> Result<Scene, Refusal> {
+    let refused = |reason| Refusal {
+        reason,
+        chunk: Some(SCENE_TAG),
+    };
+    if version != 1 {
+        return Err(refused("version"));
+    }
+    // `mesh_count` is how many mesh chunks the file really holds, not what
+    // the payload claims, so these placeholders cost what the file does. A
+    // scene that names another number of meshes is malformed (SPEC.md, 5.1).
+    decode_scene(payload, vec![Mesh::default(); mesh_count]).map_err(|_| refused("malformed"))
 }
 
 fn refusal(err: ReadBreadError) -> Refusal {
