@@ -295,7 +295,7 @@ source = "python/pyproject.toml"
 date = 2026-11-11
 
 # --- A third implementation: Caliper, in C++ --------------------------------------
-# notes/caliper.md. Done on Caliper's main, not yet in a release of Caliper.
+# notes/caliper.md. In Caliper since its release 0.9.6.
 
 [implementations.caliper]
 program = "Caliper"
@@ -304,7 +304,9 @@ language = "C++"
 reads = true
 writes = true
 written_from = "the specification of version 1 alone"
-released = false                # true once a Caliper release ships it (rules.md, rule 6)
+released = true                 # since Caliper 0.9.6 (rules.md, rule 6)
+version = "0.9.6"               # the first Caliper release that opens and saves .bread
+released_on = 2026-11-11
 
 [facts.caliper_conformance_platforms]
 value = 2
