@@ -1,0 +1,258 @@
+/* SPDX-FileCopyrightText: 2026 SynrgStudio */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Breadslicer's colours: cool graphite, and the amber of bread for the brand
+   and what is selected. */
+:root {
+	color-scheme: dark;
+	--ground: #111315;
+	--chrome: #171a1d;
+	--panel: #15181a;
+	--card: #1a1e21;
+	--hover: #262c32;
+	--border: #272d32;
+	--border-strong: #3c454d;
+	--text: #eef1f3;
+	--text-soft: #c2c9cf;
+	--text-muted: #8b959d;
+	--action: #e8ecef;
+	--on-action: #101214;
+	--accent: #e2a750;
+	--success: #5fc08f;
+	--danger: #f06a6a;
+	--radius: 3px;
+	font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--ground);
+	color: var(--text);
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+}
+
+.bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 0 16px;
+	min-height: 44px;
+	background: var(--chrome);
+	border-bottom: 1px solid var(--border);
+}
+
+.bar h1 {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.brand {
+	color: var(--accent);
+}
+
+.actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius);
+	background: var(--card);
+	color: var(--text);
+	font: inherit;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.button:hover {
+	background: var(--hover);
+}
+
+.button.primary {
+	background: var(--action);
+	border-color: var(--action);
+	color: var(--on-action);
+	font-weight: 600;
+}
+
+.button.primary:hover {
+	background: #fff;
+}
+
+.button:focus-visible,
+label.button:focus-within {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+main {
+	flex: 1;
+	display: flex;
+	min-height: 0;
+}
+
+.stage {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+}
+
+canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: grab;
+}
+
+canvas:active {
+	cursor: grabbing;
+}
+
+.empty {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 16px;
+	text-align: center;
+	pointer-events: none;
+}
+
+.empty .lead {
+	margin: 0 0 6px;
+	font-size: 17px;
+	color: var(--text);
+}
+
+.empty .hint {
+	margin: 0;
+	color: var(--text-muted);
+	max-width: 46ch;
+}
+
+.busy,
+.error {
+	position: absolute;
+	left: 50%;
+	top: 16px;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	border-radius: var(--radius);
+	background: var(--card);
+	border: 1px solid var(--border-strong);
+	max-width: calc(100% - 32px);
+}
+
+.error {
+	border-color: var(--danger);
+	color: var(--text);
+}
+
+.spinner {
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--border-strong);
+	border-top-color: var(--accent);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(1turn);
+	}
+}
+
+.panel {
+	width: 320px;
+	flex: none;
+	overflow-y: auto;
+	background: var(--panel);
+	border-left: 1px solid var(--border);
+	padding: 12px 14px 20px;
+}
+
+.panel h2 {
+	margin: 0 0 8px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-soft);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.panel section + section {
+	margin-top: 18px;
+}
+
+.facts {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 3px 12px;
+	margin: 0;
+}
+
+.facts dt {
+	color: var(--text-muted);
+}
+
+.facts dd {
+	margin: 0;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+
+.drop {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgb(17 19 21 / 0.85);
+	border: 2px dashed var(--accent);
+	font-size: 18px;
+	z-index: 10;
+	pointer-events: none;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+@media (max-width: 720px) {
+	main {
+		flex-direction: column;
+	}
+
+	.panel {
+		width: auto;
+		max-height: 45%;
+		border-left: 0;
+		border-top: 1px solid var(--border);
+	}
+}
