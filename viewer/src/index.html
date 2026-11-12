@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 SynrgStudio -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>.bread viewer</title>
+		<meta name="description" content="Open .bread files and turn STL into .bread, in your browser. Nothing leaves your computer." />
+		<link rel="icon" href="data:," />
+		<link rel="stylesheet" href="style.css" />
+		<script type="module" src="app.js"></script>
+	</head>
+	<body>
+		<header class="bar">
+			<h1><span class="brand">.bread</span> <span data-text="title">viewer</span></h1>
+			<div class="actions">
+				<label class="button primary">
+					<span data-text="open">Open .bread</span>
+					<input id="open" type="file" accept=".bread" hidden />
+				</label>
+			</div>
+		</header>
+		<main>
+			<div class="stage">
+				<canvas id="view" aria-label="3D view"></canvas>
+				<div id="empty" class="empty">
+					<p class="lead" data-text="emptyLead">Drop a .bread file here to look at it.</p>
+					<p class="hint" data-text="private">It all runs in your browser: your files never leave your computer.</p>
+					<p class="hint" data-text="controls">Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.</p>
+				</div>
+				<div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text"></span></div>
+				<div id="error" class="error" role="alert" hidden></div>
+			</div>
+			<aside id="panel" class="panel" hidden>
+				<section id="file-info"></section>
+			</aside>
+		</main>
+		<div id="drop" class="drop" hidden><p data-text="dropHere">Drop to open</p></div>
+	</body>
+</html>

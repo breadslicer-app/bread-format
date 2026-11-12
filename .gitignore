@@ -1,6 +1,7 @@
 # Build artifacts
 /target
 /bindings/js/dist
+/viewer/dist
 node_modules/
 __pycache__/
 /python/build

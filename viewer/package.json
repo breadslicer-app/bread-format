@@ -1,0 +1,16 @@
+{
+	"name": "bread-viewer",
+	"version": "0.1.0",
+	"description": "A static page that shows .bread files and turns STL into .bread, in the browser.",
+	"private": true,
+	"license": "Apache-2.0",
+	"type": "module",
+	"scripts": {
+		"build": "node build.mjs",
+		"serve": "node serve.mjs",
+		"test": "node --test"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}

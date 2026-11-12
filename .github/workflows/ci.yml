@@ -62,6 +62,9 @@ jobs:
         working-directory: bindings/js
       - run: npm test
         working-directory: bindings/js
+      # The viewer page, put together from the modules just built.
+      - run: npm run build && npm test
+        working-directory: viewer
 
   # The second reader, written from SPEC.md alone, against the conformance
   # files. Plain Python with no dependencies, so Linux is enough.
