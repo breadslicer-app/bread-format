@@ -11,8 +11,9 @@
 //!
 //! For each STL, in name order, it:
 //!
-//! 1. welds the triangle corners into vertices, two corners being one vertex
-//!    when their coordinates are bit for bit equal, numbered by first use;
+//! 1. reads it with the crate's STL reader, which welds the triangle corners
+//!    into vertices, two corners being one vertex when their coordinates are
+//!    bit for bit equal, numbered by first use;
 //! 2. writes a `.bread` file of one leaf showing that mesh, in memory, and
 //!    times it;
 //! 3. reads it back three times and keeps the fastest;
@@ -30,7 +31,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use bread_format::{BreadFile, Mesh, Node, NodeKind, Scene, read_file, write_file};
+use bread_format::{BreadFile, Mesh, Node, NodeKind, Scene, read_file, read_stl, write_file};
 
 /// One model's measurements.
 struct Row {
@@ -145,8 +146,10 @@ fn name_of(line: &str) -> Option<String> {
 
 fn measure(path: &Path) -> Result<Row, String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let corners = read_stl(&bytes)?;
-    let mesh = weld(&corners);
+    let corners = stl_corners(&bytes)?;
+    let mut mesh = read_stl(&bytes).map_err(|e| e.to_string())?;
+    // Only the geometry is measured, as before the reader kept STL headers.
+    mesh.meta = None;
     let (triangles, vertices) = (mesh.triangles.len(), mesh.vertices.len());
     let file = one_leaf(mesh);
 
@@ -178,8 +181,9 @@ fn measure(path: &Path) -> Result<Row, String> {
 }
 
 /// The corners of a binary STL, as the bits of their coordinates: three per
-/// triangle, in order. The facet normals and attribute bytes are not kept.
-fn read_stl(bytes: &[u8]) -> Result<Vec<[u32; 3]>, String> {
+/// triangle, in order. Read here apart from the crate's reader, to check what
+/// it reads.
+fn stl_corners(bytes: &[u8]) -> Result<Vec<[u32; 3]>, String> {
     let count = bytes
         .get(80..84)
         .map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")) as usize)
@@ -198,28 +202,6 @@ fn read_stl(bytes: &[u8]) -> Result<Vec<[u32; 3]>, String> {
         }
     }
     Ok(corners)
-}
-
-/// The corners welded into a mesh, as an STL importer welds them: equal bits,
-/// one vertex, numbered by first use.
-fn weld(corners: &[[u32; 3]]) -> Mesh {
-    let mut index = std::collections::HashMap::with_capacity(corners.len() / 2);
-    let mut vertices = Vec::new();
-    let ids: Vec<u32> = corners
-        .iter()
-        .map(|c| {
-            *index.entry(*c).or_insert_with(|| {
-                vertices.push(c.map(f32::from_bits));
-                (vertices.len() - 1) as u32
-            })
-        })
-        .collect();
-    let triangles = ids.as_chunks::<3>().0.to_vec();
-    Mesh {
-        meta: None,
-        vertices,
-        triangles,
-    }
 }
 
 fn one_leaf(mesh: Mesh) -> BreadFile {
