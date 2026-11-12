@@ -16,6 +16,9 @@ WebAssembly, so it makes the same checks as every other reader.
   it to download with its size before and after.
 - **Parts:** every leaf shown, with its name, its triangles and its size in millimetres in world
   positions; each can be shown or hidden, and lights up in amber while the pointer is over it.
+- **Download as STL**, for programs that do not read `.bread` yet: the parts shown as one binary
+  STL, or one part, in world positions (each vertex moved by its leaf's transform in `f64`, then
+  rounded to `f32`). A transform that mirrors keeps the faces facing out.
 - `?file=name.bread` in the address opens a file served next to the page, for links to examples.
 
 The page is in English, and in Spanish for a browser that asks for it.
@@ -32,7 +35,7 @@ The page is in English, and in Spanish for a browser that asks for it.
 
 It has no dependencies. The reading module (`bread.wasm`, about 73 KB with brotli) loads with the
 page; the writing module (`bread-write.wasm`, about 171 KB) only when STL files first come in.
-`src/convert.js` is the converter's part of the page, and `src/parts.js` the parts panel.
+`src/convert.js` is the converter's part of the page, `src/parts.js` the parts panel, and `src/download.js` the STL download.
 
 ## Building and trying it
 

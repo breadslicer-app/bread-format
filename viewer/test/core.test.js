@@ -117,6 +117,44 @@ test('an STL that cannot be read is refused for its reason', () => {
 	});
 });
 
+test('placed parts are written as one STL, in world positions', () => {
+	const opened = core.openBread(reader, file('valid/two-parts.bread'));
+	const parts = opened.placements.map((p) => ({ mesh: opened.meshes[p.mesh], matrix: p.matrix }));
+	const stl = core.toBinaryStl(parts);
+	const total = parts.reduce((sum, p) => sum + p.mesh.triangles.length / 3, 0);
+	assert.equal(stl.length, core.binaryStlSize(total));
+	assert.equal(new TextDecoder().decode(stl.subarray(0, 5)) === 'solid', false, 'a binary header must not say solid');
+	// Read back, each corner is where its leaf's transform puts it.
+	const back = writer.readStl(stl);
+	let corner = 0;
+	for (const { mesh, matrix: m } of parts) {
+		for (const v of mesh.triangles) {
+			const [x, y, z] = mesh.vertices.subarray(3 * v, 3 * v + 3);
+			const want = [
+				Math.fround(m[0] * x + m[4] * y + m[8] * z + m[12]),
+				Math.fround(m[1] * x + m[5] * y + m[9] * z + m[13]),
+				Math.fround(m[2] * x + m[6] * y + m[10] * z + m[14]),
+			];
+			const got = back.vertices.subarray(3 * back.triangles[corner], 3 * back.triangles[corner] + 3);
+			assert.deepEqual(Array.from(got), want);
+			corner++;
+		}
+	}
+});
+
+test('a mirroring transform keeps the faces facing out', () => {
+	const mesh = { vertices: Float32Array.of(0, 0, 0, 1, 0, 0, 0, 1, 0), triangles: Uint32Array.of(0, 1, 2) };
+	const mirror = Float64Array.of(-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	const back = writer.readStl(core.toBinaryStl([{ mesh, matrix: mirror }]));
+	const corners = Array.from(back.triangles, (v) => Array.from(back.vertices.subarray(3 * v, 3 * v + 3)));
+	// (0,0,0), (0,1,0), (-1,0,0): the mirrored triangle, turned back to counterclockwise from +Z.
+	assert.deepEqual(corners, [
+		[0, 0, 0],
+		[0, 1, 0],
+		[-1, 0, 0],
+	]);
+});
+
 test('placed sizes are in millimetres, in world positions', () => {
 	const cube = { vertices: Float32Array.of(0, 0, 0, 1, 2, 3, NaN, 0, 0), triangles: Uint32Array.of(0, 1, 2) };
 	const identity = Float64Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
