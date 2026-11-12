@@ -8,8 +8,8 @@
 import { placeMeshes } from './bread.js';
 
 /**
- * A `.bread` file, read: its scene, its meshes, and every leaf shown with the
- * mesh it shows and where.
+ * A `.bread` file, read: its scene, its meshes, every leaf shown with the
+ * mesh it shows and where, and the support previews, by leaf.
  *
  * @param {import('./bread.js').Bread} bread a loaded module
  * @param {Uint8Array} bytes
@@ -19,7 +19,14 @@ export function openBread(bread, bytes) {
 	const scene = bread.decodeScene(chunks);
 	const meshes = chunks.filter((chunk) => chunk.tag === 'MESH').map((chunk) => bread.decodeMesh(chunk));
 	const placements = placeMeshes(scene);
-	return { scene, meshes, placements, chunks: chunks.map((chunk) => chunk.tag) };
+	const previews = bread.decodePreviews(chunks, meshes);
+	return { scene, meshes, placements, previews, chunks: chunks.map((chunk) => chunk.tag) };
+}
+
+/** The support preview of each placement's leaf, as an index into `previews`, or -1. */
+export function previewOf(file) {
+	const byLeaf = new Map(file.previews.map((p, i) => [p.leaf, i]));
+	return file.placements.map((p) => byLeaf.get(p.leaf) ?? -1);
 }
 
 /** The bits of a float array, to compare without NaN or -0.0 getting in the way. */

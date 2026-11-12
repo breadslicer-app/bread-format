@@ -15,6 +15,7 @@ addWords({
 		showAll: 'Show all',
 		hideAll: 'Hide all',
 		partTriangles: '{count} triangles',
+		partTriangle: '1 triangle',
 		show: 'Show {name}',
 	},
 	es: {
@@ -23,6 +24,7 @@ addWords({
 		showAll: 'Mostrar todas',
 		hideAll: 'Ocultar todas',
 		partTriangles: '{count} triángulos',
+		partTriangle: '1 triángulo',
 		show: 'Mostrar {name}',
 	},
 });
@@ -100,9 +102,9 @@ function list(file) {
 		const size = file.sizes[i];
 		const detail = document.createElement('div');
 		detail.className = 'part-detail';
-		detail.textContent = `${translate('partTriangles', {
-			count: number.format(file.meshes[placement.mesh].triangles.length / 3),
-		})} · ${size.map((v) => mm.format(v)).join(' × ')} mm`;
+		const count = file.partTriangles?.[i] ?? file.meshes[placement.mesh].triangles.length / 3;
+		const triangles = count === 1 ? translate('partTriangle') : translate('partTriangles', { count: number.format(count) });
+		detail.textContent = `${triangles} · ${size.map((v) => mm.format(v)).join(' × ')} mm`;
 		const text = document.createElement('label');
 		text.className = 'part';
 		text.append(box, label, detail);

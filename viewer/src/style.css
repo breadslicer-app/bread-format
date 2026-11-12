@@ -319,6 +319,17 @@ canvas:active {
 	background: var(--card);
 }
 
+.toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+
+.toggle input {
+	accent-color: var(--accent);
+}
+
 .download {
 	margin-top: 10px;
 }

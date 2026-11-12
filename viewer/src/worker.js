@@ -7,7 +7,7 @@
 // first come in.
 
 import { BreadError, load } from './bread.js';
-import { convertStl, openBread, placedSize } from './core.js';
+import { convertStl, openBread, placedSize, previewOf } from './core.js';
 
 const reader = load(fetch(new URL('bread.wasm', import.meta.url)));
 let writer = null;
@@ -28,8 +28,13 @@ async function open(bytes) {
 	const started = performance.now();
 	const read = openBread(await reader, bytes);
 	const ms = performance.now() - started;
-	const sizes = read.placements.map((p) => placedSize(read.meshes[p.mesh], p.matrix));
-	return [{ ...read, sizes, ms, size: bytes.length }, buffers(read.meshes)];
+	// A support leaf shows an empty mesh: its part is its preview, if any.
+	const preview = previewOf(read);
+	const shown = read.placements.map((p, i) => (preview[i] >= 0 ? read.previews[preview[i]].mesh : read.meshes[p.mesh]));
+	const sizes = read.placements.map((p, i) => placedSize(shown[i], p.matrix));
+	const partTriangles = shown.map((m) => m.triangles.length / 3);
+	const transfer = [...buffers(read.meshes), ...buffers(read.previews.map((p) => p.mesh))];
+	return [{ ...read, preview, sizes, partTriangles, ms, size: bytes.length }, transfer];
 }
 
 async function convert(files, name) {

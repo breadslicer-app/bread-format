@@ -35,6 +35,17 @@ test('a shared mesh is placed twice', () => {
 	);
 });
 
+test('a support preview is drawn where its leaf is', () => {
+	const opened = core.openBread(reader, file('valid/support-preview.bread'));
+	assert.equal(opened.previews.length, 1);
+	const support = opened.scene.nodes.findIndex((n) => n.meta?.name === 'supports');
+	assert.equal(opened.previews[0].leaf, support);
+	// The model has no preview; the support leaf has the one there is.
+	assert.deepEqual(core.previewOf(opened), [-1, 0]);
+	assert.ok(opened.previews[0].mesh.triangles.length > 0);
+	assert.deepEqual(core.openBread(reader, file('valid/triangle.bread')).previews, []);
+});
+
 test('a damaged file is refused for its reason', () => {
 	assert.throws(() => core.openBread(reader, file('invalid/crc-mismatch.bread')), { reason: 'crc' });
 	assert.throws(() => core.openBread(reader, file('invalid/no-such-mesh.bread')), { reason: 'malformed' });
