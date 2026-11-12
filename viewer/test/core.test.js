@@ -40,6 +40,83 @@ test('a damaged file is refused for its reason', () => {
 	assert.throws(() => core.openBread(reader, file('invalid/no-such-mesh.bread')), { reason: 'malformed' });
 });
 
+const writer = await load(readFileSync(join(dist, 'bread-write.wasm')));
+
+/** A binary STL of `triangles`, each three corners of x, y and z. */
+function binaryStl(triangles) {
+	const bytes = new Uint8Array(84 + 50 * triangles.length);
+	const view = new DataView(bytes.buffer);
+	view.setUint32(80, triangles.length, true);
+	triangles.forEach((triangle, i) => {
+		triangle.flat().forEach((value, j) => view.setFloat32(84 + 50 * i + 12 + 4 * j, value, true));
+	});
+	return bytes;
+}
+
+const TETRA = [
+	[
+		[0, 0, 0],
+		[10, 0, 0],
+		[0, 10, 0],
+	],
+	[
+		[0, 0, 0],
+		[0, 10, 0],
+		[0, 0, -0],
+	],
+	[
+		[10, 0, 0],
+		[0, 10, 0],
+		[0.1, 0.2, 7.25],
+	],
+];
+
+test('STL files become one checked .bread file', () => {
+	const files = [
+		{ name: 'a.stl', bytes: binaryStl(TETRA) },
+		{
+			name: 'b.stl',
+			bytes: new TextEncoder().encode(
+				'solid b\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid\n',
+			),
+		},
+	];
+	const result = core.convertStl(writer, files, { name: 'kit' });
+	assert.equal(result.verified, true);
+	assert.equal(result.stlBytes, files[0].bytes.length + files[1].bytes.length);
+	assert.deepEqual(
+		result.parts.map((p) => [p.name, p.triangles, p.vertices]),
+		[
+			['a.stl', 3, 5],
+			['b.stl', 1, 3],
+		],
+	);
+	// What the viewer then opens is what was written.
+	const opened = core.openBread(reader, result.file);
+	assert.deepEqual(
+		opened.scene.nodes.map((n) => n.meta.name),
+		['a.stl', 'b.stl'],
+	);
+	assert.equal(core.sameAsBinaryStl(opened.meshes[0], files[0].bytes), true);
+	assert.equal(core.sameAsBinaryStl(opened.meshes[1], files[1].bytes), null, 'ASCII is checked another way');
+});
+
+test('a mesh that does not give back its STL fails the check', () => {
+	const stl = binaryStl(TETRA);
+	const mesh = writer.readStl(stl);
+	assert.equal(core.sameAsBinaryStl(mesh, stl), true);
+	const moved = { ...mesh, vertices: mesh.vertices.slice() };
+	moved.vertices[2] = 0.5;
+	assert.equal(core.sameAsBinaryStl(moved, stl), false);
+	assert.equal(core.sameAsBinaryStl({ ...mesh, triangles: mesh.triangles.subarray(3) }, stl), false);
+});
+
+test('an STL that cannot be read is refused for its reason', () => {
+	assert.throws(() => core.convertStl(writer, [{ name: 'x.stl', bytes: new Uint8Array(10) }]), {
+		reason: 'not-stl',
+	});
+});
+
 test('placed sizes are in millimetres, in world positions', () => {
 	const cube = { vertices: Float32Array.of(0, 0, 0, 1, 2, 3, NaN, 0, 0), triangles: Uint32Array.of(0, 1, 2) };
 	const identity = Float64Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);

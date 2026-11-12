@@ -26,7 +26,7 @@ const WORDS = {
 		asStl: 'As binary STL',
 		smaller: '{x}× smaller',
 		openedIn: 'Read in',
-		notBread: 'Only .bread files open here.',
+		notBread: 'Only .bread and STL files open here.',
 		noWebgl: 'This browser cannot draw 3D (WebGL2): the file can still be read, but not shown.',
 		refused: 'This file cannot be opened: {message}.',
 	},
@@ -46,7 +46,7 @@ const WORDS = {
 		asStl: 'Como STL binario',
 		smaller: '{x}× más chico',
 		openedIn: 'Leído en',
-		notBread: 'Acá solo se abren archivos .bread.',
+		notBread: 'Acá solo se abren archivos .bread y STL.',
 		noWebgl: 'Este navegador no puede dibujar 3D (WebGL2): el archivo se puede leer, pero no mostrar.',
 		refused: 'No se puede abrir este archivo: {message}.',
 	},
@@ -63,7 +63,17 @@ export function t(key, fill = {}) {
 	return text.replace(/\{(\w+)\}/g, (_, k) => String(fill[k] ?? ''));
 }
 
-for (const el of document.querySelectorAll('[data-text]')) el.textContent = t(el.dataset.text);
+function translatePage() {
+	for (const el of document.querySelectorAll('[data-text]')) el.textContent = t(el.dataset.text);
+}
+
+/** More words, from a part of the page that brings its own: `{ en: {...}, es: {...} }`. */
+export function addWords(more) {
+	for (const [l, words] of Object.entries(more)) Object.assign(WORDS[l], words);
+	translatePage();
+}
+
+translatePage();
 
 const number = new Intl.NumberFormat(lang);
 const decimal = new Intl.NumberFormat(lang, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -111,7 +121,7 @@ try {
 /** What is open: the file as the worker read it. */
 export const state = { name: null, file: null, hooks: [] };
 
-function showError(message) {
+export function showError(message) {
 	const box = $('error');
 	box.textContent = message;
 	box.hidden = false;
@@ -172,6 +182,8 @@ function fileFacts(file) {
 /** Opens `.bread` bytes: reads them in the worker and shows them. */
 export async function openBytes(name, data) {
 	busy(t('reading', { name }));
+	// What the converter last made belongs to the file it made.
+	$('converted').hidden = true;
 	try {
 		const file = await ask({ type: 'open', bytes: data }, [data.buffer]);
 		state.name = name;

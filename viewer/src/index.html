@@ -10,11 +10,16 @@
 		<link rel="icon" href="data:," />
 		<link rel="stylesheet" href="style.css" />
 		<script type="module" src="app.js"></script>
+		<script type="module" src="convert.js"></script>
 	</head>
 	<body>
 		<header class="bar">
 			<h1><span class="brand">.bread</span> <span data-text="title">viewer</span></h1>
 			<div class="actions">
+				<label class="button">
+					<span data-text="convert">STL to .bread</span>
+					<input id="convert" type="file" accept=".stl" multiple hidden />
+				</label>
 				<label class="button primary">
 					<span data-text="open">Open .bread</span>
 					<input id="open" type="file" accept=".bread" hidden />
@@ -26,6 +31,7 @@
 				<canvas id="view" aria-label="3D view"></canvas>
 				<div id="empty" class="empty">
 					<p class="lead" data-text="emptyLead">Drop a .bread file here to look at it.</p>
+					<p class="hint" data-text="emptyConvert">Or drop STL files to turn them into one .bread file, checked bit for bit.</p>
 					<p class="hint" data-text="private">It all runs in your browser: your files never leave your computer.</p>
 					<p class="hint" data-text="controls">Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.</p>
 				</div>
@@ -33,6 +39,7 @@
 				<div id="error" class="error" role="alert" hidden></div>
 			</div>
 			<aside id="panel" class="panel" hidden>
+				<section id="converted" hidden></section>
 				<section id="file-info"></section>
 			</aside>
 		</main>
