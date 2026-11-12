@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-12, the viewer and converter
+
+- **The viewer**: a page that opens `.bread` and turns STL into `.bread`, in the browser. It is
+  described in `notes/viewer.md`, with `[tools.viewer]` (`released = false` until the page serves
+  it at `/viewer/`) and the facts `viewer_*`.
+- `rules.md`, rule 4: the page serves the viewer as a copy of `viewer/dist`, not as a link.
+
 ## 2026-11-12, Caliper 0.9.6
 
 - `[implementations.caliper]`: `released = true`, `version = "0.9.6"`, `released_on = 2026-11-11`.
