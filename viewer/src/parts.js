@@ -44,6 +44,11 @@ export function partName(file, index) {
 	);
 }
 
+/** Which parts are hidden now, by placement. */
+export function hiddenParts() {
+	return view.hidden;
+}
+
 state.hooks.push((items) =>
 	items.map((item) => ({
 		...item,
