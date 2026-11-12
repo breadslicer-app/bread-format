@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-11-12, the viewer is online
+
+- `[tools.viewer]`: `released = true`, `released_on = 2026-11-12`: the page serves it at `/viewer/`.
+- `viewer_reader_kb` is 77 (was 73) and `web_reader_kb` 77 (was 71): the reading module grew with
+  the scene and the support previews. `viewer_writer_kb` stays 171. Sources give the bytes of main
+  `6e3cd2f`. Sizes are decimal: 76,846 bytes is 77 KB (75.0 KiB).
+- The viewer links back to the page from its title.
+
 ## 2026-11-12, the viewer and converter
 
 - **The viewer**: a page that opens `.bread` and turns STL into `.bread`, in the browser. It is
