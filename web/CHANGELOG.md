@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-11-12, Caliper 0.9.6
+
+- `[implementations.caliper]`: `released = true`, `version = "0.9.6"`, `released_on = 2026-11-11`.
+  Caliper 0.9.6 is the first release that opens and saves `.bread`.
+
 ## 2026-11-12, a third implementation
 
 - **Caliper** opens and saves `.bread`: a C++ implementation written from the specification alone.

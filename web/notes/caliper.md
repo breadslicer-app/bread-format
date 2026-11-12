@@ -10,7 +10,8 @@ implementation's code. It is the third implementation of the format, after the r
 Rust and the second reader in Python ([second-reader.md](second-reader.md)), and the first that
 both reads and writes and is not the reference.
 
-The support is done but not yet in a release of Caliper. The page says so until Caliper ships it.
+Caliper opens and saves `.bread` since its release 0.9.6, of 2026-11-11, where a `.bread` file also
+opens on double-click.
 
 **What it does:**
 
