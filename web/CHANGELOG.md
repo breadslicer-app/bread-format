@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-13, notes for the launch
+
+- New notes: `faq.md` (zip, 3MF, how to check lossless, what is left out, the license, stability),
+  `implementers.md` (how to read and write, what exists, how to help) and `launch.md` (the top of
+  the page, who it is for, the license box, the measurements page; a draft).
+- `[machine]`: the PC the corpus and the native times were measured on. `measurements.md` names it.
+
 ## 2026-11-13, against zip, Zstandard, OBJ and 3MF
 
 - New note, `notes/formats.md`: 229 MZ4250 models, every tenth, stored nine lossless ways. `.bread`

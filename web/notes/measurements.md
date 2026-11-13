@@ -1,12 +1,13 @@
 ---
 title: How the numbers were measured
 status: stable
-updated: 2026-11-11
+updated: 2026-11-13
 ---
 
-**The machine.** A desktop PC. Native numbers come from the reference implementation built in
-release mode. JavaScript numbers come from the WebAssembly module in Node 26, on V8, the engine of
-Chrome. Times are the best of several runs unless they say otherwise.
+**The machine.** A desktop PC: an AMD Ryzen 7 5800X (8 cores, 16 threads), 32 GB of memory,
+Windows 11 Pro, Rust 1.99.1 (`facts.toml`, `[machine]`). Native numbers come from the reference
+implementation built in release mode. JavaScript numbers come from the WebAssembly module in
+Node 26, on V8, the engine of Chrome. Times are the best of several runs unless they say otherwise.
 
 **Sizes** are decimal: 1 MB = 1,000,000 bytes. The exact bytes are in `data/figure-sizes.json`.
 
