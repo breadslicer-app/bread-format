@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-11-13, the numbers are checked against their data
+
+- 34 facts have `derive`: how each is computed from `data/figure-sizes.json`,
+  `data/mz4250-corpus.json`, the conformance files or `python/pyproject.toml`.
+  `check_facts.py` computes them in CI and fails if a value written is not its data rounded; all 34
+  are right. It also lists the 39 facts measured once, with their sources.
+- New field, `derive`, on facts. The page can ignore it, or show which numbers anyone can check.
+
 ## 2026-11-13, the repository is public
 
 - `project.repository` is https://github.com/breadslicer-app/bread-format, public since

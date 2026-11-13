@@ -1,6 +1,10 @@
 # What is true about the .bread format and can be published. Every number
 # the page at bread.synrgs.tech shows comes from here, by its key.
 # Sizes are decimal: 1 MB = 1,000,000 bytes, 1 KB = 1,000 bytes.
+# A fact with `derive` is computed from the repository's files, mostly
+# web/data/, and `python web/check_facts.py` (run in CI) fails when the value
+# written is not that number rounded. The others were measured once; their
+# source says where.
 
 [project]
 name = ".bread"
@@ -29,6 +33,7 @@ value = 1898864
 unit = "triangles"
 what = "triangles of the figure the size table uses"
 source = "data/figure-sizes.json"
+derive = "data('figure-sizes.json')['mesh']['triangles']"
 date = 2026-11-11
 
 [facts.figure_vertices]
@@ -36,6 +41,7 @@ value = 949406
 unit = "vertices"
 what = "vertices of the same figure"
 source = "data/figure-sizes.json"
+derive = "data('figure-sizes.json')['mesh']['vertices']"
 date = 2026-11-11
 
 [facts.figure_stl_binary_mb]
@@ -43,6 +49,7 @@ value = 94.9
 unit = "MB"
 what = "the figure as binary STL"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['stl_binary'])"
 date = 2026-11-11
 
 [facts.figure_obj_mb]
@@ -50,6 +57,7 @@ value = 69.7
 unit = "MB"
 what = "the figure as OBJ, every coordinate as the shortest decimal that reads back as the same f32"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['obj'])"
 date = 2026-11-11
 
 [facts.figure_stl_zip_mb]
@@ -57,6 +65,7 @@ value = 39.3
 unit = "MB"
 what = "the binary STL in a zip, Deflate at level 9"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['stl_zip_deflate_9'])"
 date = 2026-11-11
 
 [facts.figure_stl_7z_mb]
@@ -64,6 +73,7 @@ value = 32.2
 unit = "MB"
 what = "the binary STL in a 7z archive, at level 9 (-mx=9)"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['stl_7z_mx9'])"
 date = 2026-11-11
 
 [facts.figure_obj_zstd19_mb]
@@ -71,6 +81,7 @@ value = 12.4
 unit = "MB"
 what = "the OBJ compressed with Zstandard at level 19"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['obj_zstd_19'])"
 date = 2026-11-11
 
 [facts.figure_bread_v1_mb]
@@ -78,6 +89,7 @@ value = 7.8
 unit = "MB"
 what = "the figure as a .bread file with its mesh as MESH version 1"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['bread_mesh_v1_chunk'])"
 date = 2026-11-11
 
 [facts.figure_bread_v2_mb]
@@ -85,6 +97,7 @@ value = 6.6
 unit = "MB"
 what = "the figure as a .bread file with its mesh as MESH version 2, as the reference implementation writes it"
 source = "data/figure-sizes.json"
+derive = "mb(data('figure-sizes.json')['sizes']['bread_mesh_v2_chunk'])"
 date = 2026-11-11
 
 [facts.figure_stl_over_bread]
@@ -92,6 +105,7 @@ value = 14.4
 unit = "x"
 what = "how many times smaller the .bread file (MESH version 2) is than the binary STL"
 source = "data/figure-sizes.json"
+derive = "data('figure-sizes.json')['sizes']['stl_binary'] / data('figure-sizes.json')['sizes']['bread_mesh_v2_chunk']"
 date = 2026-11-11
 
 [facts.figure_lost_bits]
@@ -108,6 +122,7 @@ value = -15
 unit = "%"
 what = "MESH version 2 against version 1 on the figure: same content, bit for bit"
 source = "data/figure-sizes.json (-15.4%); PR #86 (-14.8% on another weld of the same figure)"
+derive = "(data('figure-sizes.json')['sizes']['bread_mesh_v2_chunk'] / data('figure-sizes.json')['sizes']['bread_mesh_v1_chunk'] - 1) * 100"
 date = 2026-11-11
 
 [facts.v2_corpus_change]
@@ -262,6 +277,7 @@ value = 18
 unit = "files"
 what = "valid conformance files, each with a JSON of what it holds"
 source = "conformance/valid on main"
+derive = "files('conformance/valid/*.bread')"
 date = 2026-11-11
 
 [facts.conformance_invalid]
@@ -269,6 +285,7 @@ value = 19
 unit = "files"
 what = "invalid conformance files, each with the reason a reader must refuse it for"
 source = "conformance/invalid on main (two-frames added in the read-through for version 1)"
+derive = "files('conformance/invalid/*.bread')"
 date = 2026-11-11
 
 # --- The second reader ------------------------------------------------------------
@@ -293,6 +310,7 @@ value = 0
 unit = "dependencies"
 what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
 source = "python/pyproject.toml"
+derive = "len(toml('python/pyproject.toml')['project'].get('dependencies', []))"
 date = 2026-11-11
 
 # --- The viewer and converter -----------------------------------------------------
@@ -429,6 +447,7 @@ value = 2288
 unit = "models"
 what = "binary STL miniatures by MZ4250, every one measured"
 source = "data/mz4250-corpus.json"
+derive = "len(models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_triangles]
@@ -436,6 +455,7 @@ value = 3240836227
 unit = "triangles"
 what = "triangles in all of them"
 source = "data/mz4250-corpus.json"
+derive = "sum(m['triangles'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_bit_exact]
@@ -443,6 +463,7 @@ value = 2288
 unit = "models"
 what = "models whose every triangle corner came back from the .bread file bit for bit, in the STL's order"
 source = "data/mz4250-corpus.json"
+derive = "sum(m['bit_exact'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_stl_gb]
@@ -450,6 +471,7 @@ value = 162.0
 unit = "GB"
 what = "all of them as binary STL"
 source = "data/mz4250-corpus.json"
+derive = "gb(sum(m['stl_bytes'] for m in models('mz4250-corpus.json')))"
 date = 2026-11-11
 
 [facts.mz4250_bread_gb]
@@ -457,6 +479,7 @@ value = 11.6
 unit = "GB"
 what = "all of them as .bread"
 source = "data/mz4250-corpus.json"
+derive = "gb(sum(m['bread_bytes'] for m in models('mz4250-corpus.json')))"
 date = 2026-11-11
 
 [facts.mz4250_ratio_overall]
@@ -464,6 +487,7 @@ value = 14.0
 unit = "x"
 what = "how many times smaller the whole corpus is as .bread than as binary STL"
 source = "data/mz4250-corpus.json"
+derive = "sum(m['stl_bytes'] for m in models('mz4250-corpus.json')) / sum(m['bread_bytes'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_ratio_median]
@@ -471,6 +495,7 @@ value = 15.1
 unit = "x"
 what = "the median, model by model, of how many times smaller the .bread file is"
 source = "data/mz4250-corpus.json"
+derive = "median([m['stl_bytes'] / m['bread_bytes'] for m in models('mz4250-corpus.json')])"
 date = 2026-11-11
 
 [facts.mz4250_ratio_min]
@@ -478,6 +503,7 @@ value = 7.7
 unit = "x"
 what = "the least, model by model"
 source = "data/mz4250-corpus.json"
+derive = "min(m['stl_bytes'] / m['bread_bytes'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_ratio_max]
@@ -485,6 +511,7 @@ value = 55.7
 unit = "x"
 what = "the most, model by model"
 source = "data/mz4250-corpus.json"
+derive = "max(m['stl_bytes'] / m['bread_bytes'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_ratio_p10]
@@ -492,6 +519,7 @@ value = 9.4
 unit = "x"
 what = "9 models in 10 are at least this many times smaller"
 source = "data/mz4250-corpus.json"
+derive = "percentile([m['stl_bytes'] / m['bread_bytes'] for m in models('mz4250-corpus.json')], 10)"
 date = 2026-11-11
 
 [facts.mz4250_ratio_p90]
@@ -499,6 +527,7 @@ value = 22.7
 unit = "x"
 what = "1 model in 10 is at least this many times smaller"
 source = "data/mz4250-corpus.json"
+derive = "percentile([m['stl_bytes'] / m['bread_bytes'] for m in models('mz4250-corpus.json')], 90)"
 date = 2026-11-11
 
 [facts.mz4250_save_median_ms]
@@ -506,6 +535,7 @@ value = 452
 unit = "ms"
 what = "the median time to write a model as .bread (the median model has 1.19 M triangles)"
 source = "data/mz4250-corpus.json"
+derive = "median([m['save_ms'] for m in models('mz4250-corpus.json')])"
 date = 2026-11-11
 
 [facts.mz4250_open_median_ms]
@@ -513,6 +543,7 @@ value = 101
 unit = "ms"
 what = "the median time to read a model back from .bread"
 source = "data/mz4250-corpus.json"
+derive = "median([m['open_ms'] for m in models('mz4250-corpus.json')])"
 date = 2026-11-11
 
 [facts.mz4250_save_mtris]
@@ -520,6 +551,7 @@ value = 2.6
 unit = "M triangles/s"
 what = "triangles written per second, over the whole corpus"
 source = "data/mz4250-corpus.json"
+derive = "sum(m['triangles'] for m in models('mz4250-corpus.json')) / sum(m['save_ms'] for m in models('mz4250-corpus.json')) / 1e3"
 date = 2026-11-11
 
 [facts.mz4250_open_mtris]
@@ -527,6 +559,7 @@ value = 11.9
 unit = "M triangles/s"
 what = "triangles read per second, over the whole corpus"
 source = "data/mz4250-corpus.json"
+derive = "sum(m['triangles'] for m in models('mz4250-corpus.json')) / sum(m['open_ms'] for m in models('mz4250-corpus.json')) / 1e3"
 date = 2026-11-11
 
 [facts.mz4250_largest_triangles]
@@ -534,6 +567,7 @@ value = 11915022
 unit = "triangles"
 what = "the largest model, Treasure Golem"
 source = "data/mz4250-corpus.json"
+derive = "max(m['triangles'] for m in models('mz4250-corpus.json'))"
 date = 2026-11-11
 
 [facts.mz4250_largest_stl_mb]
@@ -541,6 +575,7 @@ value = 595.8
 unit = "MB"
 what = "Treasure Golem as binary STL"
 source = "data/mz4250-corpus.json"
+derive = "mb(max(models('mz4250-corpus.json'), key=lambda m: m['triangles'])['stl_bytes'])"
 date = 2026-11-11
 
 [facts.mz4250_largest_bread_mb]
@@ -548,6 +583,7 @@ value = 24.4
 unit = "MB"
 what = "Treasure Golem as .bread"
 source = "data/mz4250-corpus.json"
+derive = "mb(max(models('mz4250-corpus.json'), key=lambda m: m['triangles'])['bread_bytes'])"
 date = 2026-11-11
 
 [facts.mz4250_largest_save_s]
@@ -555,6 +591,7 @@ value = 4.2
 unit = "s"
 what = "writing Treasure Golem"
 source = "data/mz4250-corpus.json"
+derive = "max(models('mz4250-corpus.json'), key=lambda m: m['triangles'])['save_ms'] / 1e3"
 date = 2026-11-11
 
 [facts.mz4250_largest_open_ms]
@@ -562,6 +599,7 @@ value = 823
 unit = "ms"
 what = "reading Treasure Golem back"
 source = "data/mz4250-corpus.json"
+derive = "max(models('mz4250-corpus.json'), key=lambda m: m['triangles'])['open_ms']"
 date = 2026-11-11
 
 [facts.mz4250_run_minutes]

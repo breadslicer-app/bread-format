@@ -78,3 +78,5 @@ jobs:
         working-directory: python
         env:
           PYTHONPATH: src
+      - name: Check the page's numbers against their data
+        run: python web/check_facts.py
