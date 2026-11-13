@@ -32,3 +32,6 @@ These rules come before everything else in `web/`. Each one says why.
 6. **No release that has not happened.** The crate is not on crates.io, the JavaScript package is
    not on npm, and the Python reader is not on PyPI. The page does not say they are, or link to
    them, until `facts.toml` says so.
+7. **No number without its source.** Every number on the page comes from `facts.toml`, by its key,
+   never typed into the page. A fact that a file in the repository can give has `derive`, and CI
+   checks it (`check_facts.py`). A fact measured once says where in its `source`.
