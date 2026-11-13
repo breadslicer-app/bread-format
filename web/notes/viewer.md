@@ -4,9 +4,10 @@ status: stable
 updated: 2026-11-12
 ---
 
-A page that opens `.bread` files and turns STL into `.bread`, in the browser. The page hosts it at
-`/viewer/`, from `viewer/` on main, built as that folder's README says. Everything happens on the
-visitor's computer: files are never sent anywhere, and there is no server behind it.
+A page that opens `.bread` files and turns STL into `.bread`, in the browser, online at `/viewer/`
+since 2026-11-12. The page hosts it from `viewer/` on main, built as that folder's README says.
+Everything happens on the visitor's computer: files are never sent anywhere, and there is no server
+behind it.
 
 **What it does:**
 
@@ -23,7 +24,7 @@ visitor's computer: files are never sent anywhere, and there is no server behind
 - **Supports:** a file's support previews, in the support colour, with a switch to hide them.
 
 **How it is made.** It reads and writes through the reference implementation built to WebAssembly,
-so it makes the same checks as every other reader. The module that reads is about 73 KB and loads
+so it makes the same checks as every other reader. The module that reads is about 77 KB and loads
 with the page. The one that also writes is about 171 KB and loads only when STL files come in.
 Both sizes are with brotli. Files are read and written off the page's thread, so the page does not
 freeze on a large one. The page has no other dependencies.

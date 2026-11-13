@@ -9,7 +9,7 @@ It reads the container, the chunks of a file, each checked and decompressed; the
 `MESH` versions 1 and 2; and the scene that places them. It also reads STL files and writes `.bread`
 files.
 
-The module comes built twice. `dist/bread.wasm` reads, and is about 73 KB with brotli.
+The module comes built twice. `dist/bread.wasm` reads, and is about 77 KB with brotli.
 `dist/bread-write.wasm` also reads STL and writes `.bread`, and is about 171 KB, because it takes
 zstd's compressor and meshoptimizer's encoders. A page that only shows files loads the first; one
 that converts loads the second when it is needed. Both read the same way.

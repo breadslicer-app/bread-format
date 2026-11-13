@@ -62,6 +62,14 @@ body {
 	color: var(--accent);
 }
 
+.home {
+	text-decoration: none;
+}
+
+.home:hover .brand {
+	text-decoration: underline;
+}
+
 .actions {
 	display: flex;
 	gap: 8px;

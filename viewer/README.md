@@ -35,7 +35,7 @@ The page is in English, and in Spanish for a browser that asks for it.
 | `src/worker.js` | reads and writes in a Web Worker, so the page never freezes on a large file |
 | `src/core.js` | what is done with files, apart from the page, and tested in Node |
 
-It has no dependencies. The reading module (`bread.wasm`, about 73 KB with brotli) loads with the
+It has no dependencies. The reading module (`bread.wasm`, about 77 KB with brotli) loads with the
 page; the writing module (`bread-write.wasm`, about 171 KB) only when STL files first come in.
 `src/convert.js` is the converter's part of the page, `src/parts.js` the parts panel, `src/download.js` the STL download, and `src/supports.js` the support previews.
 

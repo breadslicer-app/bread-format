@@ -241,11 +241,11 @@ source = "PR #92"
 date = 2026-11-11
 
 [facts.web_reader_kb]
-value = 71
+value = 77
 unit = "KB"
 what = "the WebAssembly module that reads .bread in JavaScript, compressed with brotli; it reads, it does not write"
-source = "dist/bread.wasm of main, 70,884 bytes with brotli at quality 11"
-date = 2026-11-11
+source = "dist/bread.wasm of main 6e3cd2f, 219,479 bytes, 76,846 with brotli at quality 11; it grew by the scene and the support previews"
+date = 2026-11-12
 
 [facts.identical_platforms]
 value = 3
@@ -302,20 +302,21 @@ path = "/viewer/"
 source = "viewer/ on main: npm run build in bindings/js, then in viewer; viewer/dist is the whole page"
 runs = "in the browser only: files never leave the visitor's computer"
 languages = ["en", "es"]
-released = false                # true once the page serves it at /viewer/
+released = true                 # served at bread.synrgs.tech/viewer/ since 2026-11-12
+released_on = 2026-11-12
 
 [facts.viewer_reader_kb]
-value = 73
+value = 77
 unit = "KB"
 what = "the WebAssembly module the viewer loads with the page, which reads, compressed with brotli"
-source = "bindings/js/dist/bread.wasm, 210,816 bytes, brotli at quality 11"
+source = "bindings/js/dist/bread.wasm of main 6e3cd2f, 219,479 bytes, 76,846 with brotli at quality 11"
 date = 2026-11-12
 
 [facts.viewer_writer_kb]
 value = 171
 unit = "KB"
 what = "the module that also reads STL and writes .bread, loaded only when STL files come in, with brotli"
-source = "bindings/js/dist/bread-write.wasm, 661,716 bytes, brotli at quality 11"
+source = "bindings/js/dist/bread-write.wasm of main 6e3cd2f, 665,479 bytes, 171,464 with brotli at quality 11"
 date = 2026-11-12
 
 [facts.viewer_convert_triangles]
