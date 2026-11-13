@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-13, the repository is public
+
+- `project.repository` is https://github.com/breadslicer-app/bread-format, public since
+  `project.repository_public_on`, 2026-11-13. The page can link to it.
+- `rules.md`, rule 4: links to the repository are allowed now, to `main` or a tag. The viewer is
+  still served as a copy of `viewer/dist`.
+
 ## 2026-11-12, the viewer is online
 
 - `[tools.viewer]`: `released = true`, `released_on = 2026-11-12`: the page serves it at `/viewer/`.
