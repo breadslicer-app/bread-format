@@ -12,12 +12,13 @@ chunk_versions = { SCNE = 1, MESH = 2, THMB = 1, PROJ = 1, SUPP = 2, HOLW = 2, S
 mesh_versions_read = [1, 2]
 spec_status = "frozen"          # version 1, tag spec-v1
 license = "Apache-2.0"
+repository = "https://github.com/breadslicer-app/bread-format"
+repository_public_on = 2026-11-13
 reference_implementation = "bread-format, a Rust crate, also built to WebAssembly for JavaScript"
 version = "0.3.0"               # of the reference implementation
 released = 2026-11-11
 earlier_versions = [{ version = "0.2.0", released = 2026-11-11 }, { version = "0.1.0", released = 2026-10-30 }]
 units = "millimetres; right-handed axes, Z up, XY is the build plate"
-# No repo links: the repository is private (rules.md).
 
 # --- The 1.9 M triangle figure ---------------------------------------------
 # One mesh, a figure, stored losslessly seven ways. data/figure-sizes.json has

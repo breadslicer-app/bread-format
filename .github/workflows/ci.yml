@@ -1,7 +1,5 @@
 # Format, lints and tests on every pull request.
-# Kept light: on a private repository the minutes come out of the free plan's
-# monthly quota, and Windows minutes count double. Formatting does not depend
-# on the platform, so it runs on Linux only.
+# Formatting does not depend on the platform, so it runs on Linux only.
 name: CI
 on:
   pull_request:
