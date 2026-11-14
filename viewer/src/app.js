@@ -13,6 +13,7 @@ const WORDS = {
 	en: {
 		title: 'viewer',
 		open: 'Open .bread',
+		emptyLabel: 'Viewer · .bread',
 		emptyLead: 'Drop a .bread file here to look at it.',
 		private: 'It all runs in your browser: your files never leave your computer.',
 		controls: 'Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.',
@@ -35,6 +36,7 @@ const WORDS = {
 	es: {
 		title: 'visor',
 		open: 'Abrir .bread',
+		emptyLabel: 'Visor · .bread',
 		emptyLead: 'Soltá un archivo .bread acá para verlo.',
 		private: 'Todo pasa en tu navegador: tus archivos nunca salen de tu computadora.',
 		controls: 'Arrastrá para girar · clic derecho o shift para mover · rueda para acercar · doble clic para encuadrar.',
