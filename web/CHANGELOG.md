@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-13, the viewer compares side by side
+
+- `notes/viewer.md`: after converting a binary STL, the viewer shows the STL and the `.bread` file
+  side by side, with a loupe and the bits of the triangle under the pointer. The page serves it as
+  before, from `viewer/` built on main.
+- New fact, `viewer_compare_max_triangles`: 8,000,000, the most it compares.
+
 ## 2026-11-13, notes for the launch
 
 - New notes: `faq.md` (zip, 3MF, how to check lossless, what is left out, the license, stability),
