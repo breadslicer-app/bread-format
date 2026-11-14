@@ -1,6 +1,6 @@
 ---
 title: The page for a public launch
-status: draft
+status: stable
 updated: 2026-11-13
 ---
 
@@ -10,10 +10,12 @@ What the page says first, for people who have never heard of `.bread`. Every num
 **The top of the page.**
 
 - **Title:** Lossless STL replacement.
-- **Below it:** `mz4250_ratio_overall` times smaller on 2,288 public miniatures, and
-  `v2_corpus_ratio_min` to `v2_corpus_ratio_max` times on 22 other meshes, from 3D scans to CAD
-  parts. Every vertex bit for bit. An open format, Apache-2.0. The range is said with the headline
-  number, so no one reads 14× as a promise for every model.
+- **Below it:** `mz4250_ratio_overall` times smaller on `mz4250_models` public miniatures, and
+  `v2_corpus_ratio_min` to `v2_corpus_ratio_max` times on `v2_corpus_meshes` other meshes, from 3D
+  scans to CAD parts. Every vertex bit for bit. An open format, Apache-2.0. The range is said with
+  the headline number, so no one reads 14× as a promise for every model. The first part, "14 times
+  smaller on 2,288 public miniatures", links to the corpus section, where those models and their
+  credit are.
 - **Buttons, in this order:** Convert an STL (`/viewer/`) · See the measurements · Read the
   specification · GitHub (`project.repository`).
 - **One line under them:** Runs in your browser. Your files never leave your computer.
