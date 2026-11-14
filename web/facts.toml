@@ -434,6 +434,14 @@ date = 2026-11-12
 # data/mz4250-corpus.json has one row per model; notes/mz4250-corpus.md says
 # how they were measured.
 
+[machine]
+# Where the corpus runs (tools/corpus-bench) and the native timings were measured.
+cpu = "AMD Ryzen 7 5800X, 8 cores, 16 threads"
+memory_gb = 32
+os = "Windows 11 Pro"
+rust = "1.99.1"
+disk = "STLs read from a SATA hard disk; every time is in memory, after the file is read"
+
 [credit.mz4250]
 creator = "MZ4250"
 printables = "https://www.printables.com/@MZ4250"
