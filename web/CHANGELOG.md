@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-13, the top of the page is approved
+
+- `notes/launch.md` is `stable`: Damian approved the top of the page as drafted, with one change:
+  "14 times smaller on 2,288 public miniatures" links to the corpus section. The two counts are
+  named by their facts now, `mz4250_models` and `v2_corpus_meshes`. Funding and counting visits
+  stay out (issues #126 and #127).
+
 ## 2026-11-13, the viewer compares side by side
 
 - `notes/viewer.md`: after converting a binary STL, the viewer shows the STL and the `.bread` file
