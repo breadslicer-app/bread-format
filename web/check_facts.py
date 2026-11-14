@@ -92,7 +92,7 @@ def main():
         if expression is None:
             unchecked.append(key)
             continue
-        computed = eval(expression, {"__builtins__": {}}, dict(HELPERS))
+        computed = eval(expression, {"__builtins__": {}, **HELPERS})
         places = decimals(fact["value"])
         rounded = round(computed, places) if places else round(computed)
         checked += 1

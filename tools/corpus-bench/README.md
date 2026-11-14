@@ -45,10 +45,11 @@ and checked corner by corner against the STL:
 | `obj_zstd_19` | that OBJ with Zstandard at level 19 |
 | `3mf` | 3MF: its model, with the same decimals, in a zip at Deflate's default level 6 |
 
-Zstandard runs on `--zstd-threads` threads, all the machine's by default, as `zstd -T0`; everything
-else on one thread. Each row then has a `formats` object, `{"<key>": {"bytes", "write_ms",
-"read_ms", "bit_exact"}}`, and `<out>.csv` gets one line per model and format, `.bread` included.
-The summary at the end gives each format's total and how much smaller `.bread` is than it.
+Zstandard runs on `--zstd-threads` threads, all the machine's by default, as `zstd -T0`; zip, gzip
+and 3MF on one thread; `.bread` as the reference implementation runs it, some steps side by side.
+Each row then has a `formats` object, `{"<key>": {"bytes", "write_ms", "read_ms", "bit_exact"}}`,
+and `<out>.csv` gets one line per model and format, `.bread` included. The summary at the end gives
+each format's total and how much smaller `.bread` is than it.
 
 OBJ and 3MF are lossless here only because every coordinate is written with enough digits. A writer
 that rounds them, as many do, loses bits; those files are not measured.

@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 2026-11-13, against zip, Zstandard, OBJ and 3MF
+
+- New note, `notes/formats.md`: 229 MZ4250 models, every tenth, stored nine lossless ways. `.bread`
+  is the smallest for every one of them and the fastest to read; the nearest, OBJ with Zstandard
+  at level 19, is 2.3 times larger.
+- New data, `data/mz4250-formats.json` (with its header: credit, machine, command, what each format
+  is) and `data/mz4250-formats.csv`, one line per model and format.
+- 40 new facts, `formats_*`, all with `derive`: 74 facts are checked now.
+- `check_facts.py`: an expression inside another one, like `min` inside a `sum`, now sees the
+  helpers too.
+
 ## 2026-11-13, the numbers are checked against their data
 
 - 34 facts have `derive`: how each is computed from `data/figure-sizes.json`,

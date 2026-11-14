@@ -622,3 +622,328 @@ unit = "triangles"
 what = "triangles in that sample"
 source = "same check"
 date = 2026-11-11
+
+# --- Against other formats: a sample of the same corpus ----------------------
+# data/mz4250-formats.json: every tenth MZ4250 STL in name order, stored as .bread
+# and eight other lossless ways; notes/formats.md says how. The CSV beside it has
+# the same rows, one line per model and format. Times are sums over the sample.
+
+[facts.formats_models]
+value = 229
+unit = "models"
+what = "models in the sample: every tenth STL of the corpus, in name order"
+source = "data/mz4250-formats.json"
+derive = "len(models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_triangles]
+value = 327350439
+unit = "triangles"
+what = "triangles in the sample"
+source = "data/mz4250-formats.json"
+derive = "sum(m['triangles'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_bit_exact]
+value = 229
+unit = "models"
+what = "models whose every corner came back bit for bit from every one of the nine ways of storing them"
+source = "data/mz4250-formats.json"
+derive = "sum((m['bit_exact'] and min(f['bit_exact'] for f in m['formats'].values())) for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_bread_smaller]
+value = 229
+unit = "models"
+what = "models whose .bread file is smaller than every one of the other eight"
+source = "data/mz4250-formats.json"
+derive = "sum((m['bread_bytes'] < min(f['bytes'] for f in m['formats'].values())) for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_bread_gb]
+value = 1.14
+unit = "GB"
+what = "the sample as .bread"
+source = "data/mz4250-formats.json"
+derive = "sum(m['bread_bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_bread_write_s]
+value = 129
+unit = "s"
+what = "writing it, some steps side by side on threads, as the reference implementation does"
+source = "data/mz4250-formats.json"
+derive = "sum(m['save_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_bread_read_s]
+value = 28
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['open_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_gb]
+value = 16.37
+unit = "GB"
+what = "the sample as binary STL"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_stl_over_bread]
+value = 14.3
+unit = "x"
+what = "how many times smaller the sample is as .bread than as binary STL"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_stl_write_s]
+value = 11
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_read_s]
+value = 66
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zip_9_gb]
+value = 7.53
+unit = "GB"
+what = "the sample as the binary STL zipped, Deflate at level 9"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zip_9']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_stl_zip_9_over_bread]
+value = 6.6
+unit = "x"
+what = "how many times smaller the sample is as .bread than as the binary STL zipped, Deflate at level 9"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zip_9']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_stl_zip_9_write_s]
+value = 327
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zip_9']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zip_9_read_s]
+value = 96
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zip_9']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_3_gb]
+value = 7.26
+unit = "GB"
+what = "the sample as the binary STL with Zstandard at level 3"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_3']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_3_over_bread]
+value = 6.3
+unit = "x"
+what = "how many times smaller the sample is as .bread than as the binary STL with Zstandard at level 3"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_3']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_3_write_s]
+value = 22
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_3']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_3_read_s]
+value = 89
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_3']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_19_gb]
+value = 6.56
+unit = "GB"
+what = "the sample as the binary STL with Zstandard at level 19"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_19']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_19_over_bread]
+value = 5.7
+unit = "x"
+what = "how many times smaller the sample is as .bread than as the binary STL with Zstandard at level 19"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_19']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_19_write_s]
+value = 1604
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_19']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_stl_zstd_19_read_s]
+value = 92
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['stl_zstd_19']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_gb]
+value = 12.52
+unit = "GB"
+what = "the sample as OBJ"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_obj_over_bread]
+value = 10.9
+unit = "x"
+what = "how many times smaller the sample is as .bread than as OBJ"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_obj_write_s]
+value = 57
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_read_s]
+value = 32
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_gzip_9_gb]
+value = 3.56
+unit = "GB"
+what = "the sample as OBJ with gzip at level 9"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_gzip_9']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_obj_gzip_9_over_bread]
+value = 3.1
+unit = "x"
+what = "how many times smaller the sample is as .bread than as OBJ with gzip at level 9"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_gzip_9']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_obj_gzip_9_write_s]
+value = 890
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_gzip_9']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_gzip_9_read_s]
+value = 53
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_gzip_9']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_zstd_19_gb]
+value = 2.61
+unit = "GB"
+what = "the sample as OBJ with Zstandard at level 19"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_zstd_19']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_obj_zstd_19_over_bread]
+value = 2.3
+unit = "x"
+what = "how many times smaller the sample is as .bread than as OBJ with Zstandard at level 19"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_zstd_19']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_obj_zstd_19_write_s]
+value = 3698
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_zstd_19']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_zstd_19_read_s]
+value = 58
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_zstd_19']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_three_mf_gb]
+value = 4.21
+unit = "GB"
+what = "the sample as 3MF"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['3mf']['bytes'] for m in models('mz4250-formats.json')) / 1e9"
+date = 2026-11-13
+
+[facts.formats_three_mf_over_bread]
+value = 3.7
+unit = "x"
+what = "how many times smaller the sample is as .bread than as 3MF"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['3mf']['bytes'] for m in models('mz4250-formats.json')) / sum(m['bread_bytes'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
+
+[facts.formats_three_mf_write_s]
+value = 401
+unit = "s"
+what = "writing it"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['3mf']['write_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_three_mf_read_s]
+value = 303
+unit = "s"
+what = "reading it back into corners, the fastest of three for each model"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['3mf']['read_ms'] for m in models('mz4250-formats.json')) / 1000"
+date = 2026-11-13
+
+[facts.formats_obj_zstd_19_write_over_bread]
+value = 29
+unit = "x"
+what = "how many times longer writing the sample as OBJ with Zstandard at level 19 takes than writing it as .bread"
+source = "data/mz4250-formats.json"
+derive = "sum(m['formats']['obj_zstd_19']['write_ms'] for m in models('mz4250-formats.json')) / sum(m['save_ms'] for m in models('mz4250-formats.json'))"
+date = 2026-11-13
