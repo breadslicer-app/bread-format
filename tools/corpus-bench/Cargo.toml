@@ -10,6 +10,9 @@ publish = false
 
 [dependencies]
 bread-format = { path = "../../crates/bread-format" }
+flate2 = "1.1.11"
+zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
+zstd = { version = "0.13", default-features = false, features = ["zstdmt"] }
 
 [lints]
 workspace = true
