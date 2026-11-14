@@ -15,6 +15,10 @@ import numpy as np
 from . import native
 from .native import BreadError
 
+# Breadslicer's one raft for every model on a plate is a mesh of the scene,
+# not part of any supports document, named so.
+PLATE_RAFT_NAME = "Raft"
+
 # Past this many nodes walked, each copy counted, a scene is refused: a small
 # file can ask for a great many copies of copies.
 PLACEMENT_LIMIT = 1_000_000
@@ -127,9 +131,34 @@ class Contents:
             self._meshes[index] = native.decode_mesh(self._mesh_chunks[index])
         return self._meshes[index]
 
-    def models(self) -> list[Placement]:
-        """The leaves shown that are not supports."""
+    def plate_rafts(self) -> list[Placement]:
+        """Breadslicer's one raft for every model, in a file with its
+        supports: a leaf whose mesh is named "Raft"."""
+        if not any(e.generator == "df" for e in self.supports):
+            return []
         leaves = self.support_leaves
+        return [
+            p for p in self.placements
+            if p.leaf not in leaves and self.mesh_name(p.mesh) == PLATE_RAFT_NAME
+        ]
+
+    def mesh_name(self, index: int) -> str | None:
+        """A mesh's name, read from the start of its chunk, which both
+        versions of MESH share (SPEC 6.2), without decoding the mesh."""
+        payload = self._mesh_chunks[index].payload
+        if len(payload) < 2 or payload[0] != 1 or payload[1] != 1:
+            return None
+        if len(payload) < 6:
+            return None
+        length = struct.unpack_from("<I", payload, 2)[0]
+        name = payload[6 : 6 + length]
+        if len(name) != length:
+            return None
+        return name.decode("utf-8", "replace")
+
+    def models(self) -> list[Placement]:
+        """The leaves shown that are neither supports nor a plate raft."""
+        leaves = self.support_leaves | {p.leaf for p in self.plate_rafts()}
         return [p for p in self.placements if p.leaf not in leaves]
 
     def previews(self) -> dict[int, native.Mesh]:

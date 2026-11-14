@@ -222,7 +222,7 @@ class IMPORT_SCENE_OT_bread(bpy.types.Operator, ImportHelper):
                     meshes[index] = _new_mesh(name, m.vertices, m.triangles)
                 add(name, meshes[index], p.matrix)
 
-        built = 0
+        built = plate_rafts = 0
         if self.import_supports:
             by_leaf = {}
             for p in c.placements:
@@ -275,12 +275,22 @@ class IMPORT_SCENE_OT_bread(bpy.types.Operator, ImportHelper):
                     for p in by_leaf.get(leaf, []):
                         add(f"{stem} supports", me, p.matrix)
                         built += 1
+            # Breadslicer's one raft for every model, kept as is.
+            rafts = {}
+            for p in c.plate_rafts():
+                if p.mesh not in rafts:
+                    m = c.mesh(p.mesh)
+                    rafts[p.mesh] = _new_mesh(bread.PLATE_RAFT_NAME, m.vertices, m.triangles)
+                    rafts[p.mesh].materials.append(_support_material())
+                add(bread.PLATE_RAFT_NAME, rafts[p.mesh], p.matrix)
+                plate_rafts += 1
 
-        models = len(objects) - built
+        models = len(objects) - built - plate_rafts
+        raft = f", {plate_rafts} raft for all" if plate_rafts else ""
         self.report(
             {"INFO"},
             f"{stem}: {models} model{'s' if models != 1 else ''}, "
-            f"{built} set{'s' if built != 1 else ''} of supports "
+            f"{built} set{'s' if built != 1 else ''} of supports{raft} "
             f"in {time.perf_counter() - started:.2f} s",
         )
         return objects

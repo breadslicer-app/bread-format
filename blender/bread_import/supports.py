@@ -13,7 +13,8 @@ decides where supports go: it only gives each piece a shape.
 - a stretch between two joints is a cylinder, and each joint and knot a ball;
 - a tip is a thin disk on the model and a cone from it to the support;
 - a brace is a cylinder from knot to knot;
-- the raft, when there is one, is a slab under the bases with a sloped edge.
+- the raft, when there is one, is a plate under the bases, sloped underneath,
+  with a low wall along its edge that has gaps for resin to drain.
 
 The pieces overlap and are not merged, as a slicer expects them. Everything is
 built with numpy, in batches, so thousands of supports take a fraction of a
@@ -81,7 +82,8 @@ class Shapes:
 
     cylinders: list[tuple] = field(default_factory=list)
     balls: list[tuple] = field(default_factory=list)
-    raft: tuple[np.ndarray, np.ndarray] | None = None
+    # The bases, the raft's thickness, and whether it has a wall.
+    raft: tuple[list, float, bool] | None = None
 
     def cylinder(self, p0, p1, r0, r1=None):
         if p0 is None or p1 is None:
@@ -183,22 +185,21 @@ def _hull(points: np.ndarray) -> np.ndarray:
     return np.array(lower[:-1] + upper[:-1])
 
 
-def _raft_mesh(bases: list[tuple], thickness: float, sides: int):
-    """A slab under the bases: the hull around them, ``thickness`` high, with
-    a 45° edge."""
-    t = np.arange(32) * (2 * math.pi / 32)
-    ring = np.stack([np.cos(t), np.sin(t)], 1)
-    pts = np.concatenate([c[None, :2] + r * ring for c, r in bases])
-    floor = min(c[2] for c, _ in bases)
-    bottom = _hull(pts)
-    n = len(bottom)
-    if n < 3:
-        return None
-    # The top, moved in by the thickness along each corner's bisector.
-    prev = np.roll(bottom, 1, axis=0)
-    nxt = np.roll(bottom, -1, axis=0)
-    e_in = bottom - prev
-    e_out = nxt - bottom
+# The raft: a plate under the bases, its edge sloped at 45° underneath, and a
+# low wall along its top edge with gaps every few millimetres, so resin
+# drains.
+RAFT_WALL_HEIGHT = 0.35
+RAFT_WALL_THICKNESS = 0.5
+RAFT_WALL_GAP = 1.5
+RAFT_WALL_SPACING = 5.0
+
+
+def _inset(poly: np.ndarray, d: float) -> np.ndarray:
+    """A convex counter-clockwise polygon moved in by ``d``."""
+    prev = np.roll(poly, 1, axis=0)
+    nxt = np.roll(poly, -1, axis=0)
+    e_in = poly - prev
+    e_out = nxt - poly
     n_in = np.stack([e_in[:, 1], -e_in[:, 0]], 1)
     n_out = np.stack([e_out[:, 1], -e_out[:, 0]], 1)
     n_in /= np.linalg.norm(n_in, axis=1)[:, None]
@@ -206,8 +207,46 @@ def _raft_mesh(bases: list[tuple], thickness: float, sides: int):
     bis = n_in + n_out
     bis /= np.linalg.norm(bis, axis=1)[:, None]
     cos_half = np.clip(np.sum(bis * n_out, axis=1), 0.2, 1.0)
-    inset = min(thickness, 0.25 * float(np.min(np.ptp(bottom, axis=0))))
-    top = bottom - (inset / cos_half)[:, None] * bis
+    return poly - (d / cos_half)[:, None] * bis
+
+
+def _wall_piece(outer: np.ndarray, inner: np.ndarray, z0: float, z1: float):
+    """A closed stretch of wall between two matching polylines."""
+    m = len(outer)
+    verts = np.concatenate([
+        np.column_stack([outer, np.full(m, z0)]),
+        np.column_stack([outer, np.full(m, z1)]),
+        np.column_stack([inner, np.full(m, z0)]),
+        np.column_stack([inner, np.full(m, z1)]),
+    ])
+    p0, p1, q0, q1 = 0, m, 2 * m, 3 * m
+    quads = []
+    for k in range(m - 1):
+        quads += [
+            (p0 + k, p0 + k + 1, p1 + k + 1, p1 + k),  # outside
+            (p1 + k, p1 + k + 1, q1 + k + 1, q1 + k),  # top
+            (q0 + k + 1, q0 + k, q1 + k, q1 + k + 1),  # inside
+            (p0 + k + 1, p0 + k, q0 + k, q0 + k + 1),  # bottom
+        ]
+    e = m - 1
+    quads += [(p0, p1, q1, q0), (p0 + e, q0 + e, q1 + e, p1 + e)]  # ends
+    tris = [t for a, b, c, d in quads for t in ((a, b, c), (a, c, d))]
+    return verts, np.array(tris)
+
+
+def _raft_mesh(bases: list[tuple], thickness: float, wall: bool):
+    """The raft under ``bases``: the hull around them, grown to clear the
+    sloped edge and the wall."""
+    t = np.arange(32) * (2 * math.pi / 32)
+    ring = np.stack([np.cos(t), np.sin(t)], 1)
+    margin = thickness + (RAFT_WALL_THICKNESS if wall else 0.0)
+    pts = np.concatenate([c[None, :2] + (r + margin) * ring for c, r in bases])
+    floor = min(c[2] for c, _ in bases)
+    top = _hull(pts)
+    n = len(top)
+    if n < 3:
+        return None
+    bottom = _inset(top, min(thickness, 0.25 * float(np.min(np.ptp(top, axis=0)))))
     verts = np.concatenate([
         np.column_stack([bottom, np.full(n, floor)]),
         np.column_stack([top, np.full(n, floor + thickness)]),
@@ -218,7 +257,38 @@ def _raft_mesh(bases: list[tuple], thickness: float, sides: int):
     k = np.arange(1, n - 1)
     tris.append(np.stack([np.zeros_like(k), k + 1, k], 1))  # floor, facing down
     tris.append(np.stack([np.full_like(k, n), n + k, n + k + 1], 1))  # top, facing up
-    return verts, np.concatenate(tris)
+    parts = [(verts, np.concatenate(tris))]
+    if wall:
+        parts += _wall(top, floor + thickness)
+    return parts
+
+
+def _wall(outline: np.ndarray, z: float) -> list:
+    inner = _inset(outline, RAFT_WALL_THICKNESS)
+    outer_loop = np.vstack([outline, outline[:1]])
+    inner_loop = np.vstack([inner, inner[:1]])
+    lengths = np.linalg.norm(np.diff(outer_loop, axis=0), axis=1)
+    at = np.concatenate([[0.0], np.cumsum(lengths)])
+    total = float(at[-1])
+    periods = max(1, round(total / RAFT_WALL_SPACING))
+    period = total / periods
+    gap = min(RAFT_WALL_GAP, 0.5 * period)
+
+    def point(s):
+        e = min(int(np.searchsorted(at, s, side="right")) - 1, len(lengths) - 1)
+        f = (s - at[e]) / lengths[e] if lengths[e] > 0 else 0.0
+        return (
+            outer_loop[e] + f * (outer_loop[e + 1] - outer_loop[e]),
+            inner_loop[e] + f * (inner_loop[e + 1] - inner_loop[e]),
+        )
+
+    pieces = []
+    for p in range(periods):
+        s0, s1 = p * period, (p + 1) * period - gap
+        stops = [s0] + [float(a) for a in at if s0 < a < s1] + [s1]
+        outer, inner_pts = zip(*(point(s) for s in stops))
+        pieces.append(_wall_piece(np.array(outer), np.array(inner_pts), z, z + RAFT_WALL_HEIGHT))
+    return pieces
 
 
 def shapes(document: dict) -> Shapes:
@@ -395,8 +465,15 @@ def shapes(document: dict) -> Shapes:
 
     options = (document.get("recipe") or {}).get("options") or {}
     thickness = _num(options, "raftThicknessMm")
-    if options.get("raft") not in (None, "none", "off", False) and thickness > 0 and bases:
-        out.raft = (bases, thickness)
+    # With one raft for every model ("oneRaft"), Breadslicer keeps that raft
+    # as a mesh of the scene, so the supports bring none of their own.
+    if (
+        options.get("raft") not in (None, "none", "off", False)
+        and not options.get("oneRaft")
+        and thickness > 0
+        and bases
+    ):
+        out.raft = (bases, thickness, options.get("raftWall") is not False)
     return out
 
 
@@ -411,9 +488,7 @@ def build(document: dict, detail: str = "MEDIUM") -> tuple[np.ndarray, np.ndarra
     if s.balls:
         parts.append(_ball_mesh(s.balls, sides))
     if s.raft is not None:
-        raft = _raft_mesh(*s.raft, sides)
-        if raft is not None:
-            parts.append(raft)
+        parts += _raft_mesh(*s.raft) or []
     verts, tris, offset = [], [], 0
     for v, t in parts:
         verts.append(v)

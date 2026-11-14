@@ -105,6 +105,14 @@ class ImportConformance(unittest.TestCase):
         lines, _ = importer._summary_text(str(REPO / "conformance" / "invalid" / "cut-short.bread"))
         self.assertTrue(lines[0].startswith("Cannot read it"))
 
+    def test_mesh_names_read_without_decoding(self):
+        from bread_import import contents
+
+        c = contents.read((VALID / "slicer-data.bread").read_bytes())
+        self.assertEqual([c.mesh_name(i) for i in range(3)], [None, None, "original"])
+        # No "Raft" here, and the supports are not Breadslicer's: no plate raft.
+        self.assertEqual(c.plate_rafts(), [])
+
     def test_a_refused_file_imports_nothing(self):
         clear()
         with self.assertRaises(RuntimeError):

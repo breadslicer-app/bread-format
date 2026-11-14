@@ -28,9 +28,12 @@ It needs Blender 4.2 or later, and has been tried on Blender 5.2.
   versions 1 and 2) already says where each piece goes and how big it is, so nothing here decides
   where supports go: each base becomes a disk with a cone up to its trunk; each stretch between
   joints a cylinder; each joint and knot a ball; each tip a thin disk on the model and a cone to
-  the support; each brace a cylinder from knot to knot; and the raft, when there is one, a slab
-  under the bases with a sloped edge. Pieces overlap and are not merged, as a slicer expects.
-  They are built with numpy, in batches: about 0.06 s for a figure with 600 supports.
+  the support; each brace a cylinder from knot to knot; and the raft, when there is one, a plate
+  under the bases, sloped underneath, with a low wall along its edge that has gaps for resin to
+  drain. With one raft for every model, Breadslicer keeps that raft as a mesh of the scene named
+  "Raft": it comes with the supports, as it is, and the supports build none of their own. Pieces
+  overlap and are not merged, as a slicer expects. They are built with numpy, in batches: about
+  0.06 s for a figure with 600 supports.
 - `bread_import/importer.py` is the operator, the menu entry and the file handler for dropped
   files.
 

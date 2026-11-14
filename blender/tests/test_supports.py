@@ -140,8 +140,26 @@ class Build(unittest.TestCase):
     def test_the_raft_lies_under_the_bases(self):
         v, _ = supports.build(DOCUMENT)
         self.assertAlmostEqual(float(v[:, 2].min()), 0.0)
-        flat = v[np.isclose(v[:, 2], 0.0)]
-        self.assertAlmostEqual(float(np.abs(flat[:, :2]).max()), 2.5, places=4)
+        # Its top reaches past the base (2.5) by the slope (0.5) and the wall
+        # (0.5); its floor is 0.5 in, under the slope.
+        floor = v[np.isclose(v[:, 2], 0.0)]
+        self.assertAlmostEqual(float(np.abs(floor[:, :2]).max()), 3.0, delta=0.05)
+        top = v[np.isclose(v[:, 2], 0.5)]
+        self.assertAlmostEqual(float(np.abs(top[:, :2]).max()), 3.5, places=4)
+        # The wall stands on top of it.
+        self.assertTrue(np.any(np.isclose(v[:, 2], 0.5 + supports.RAFT_WALL_HEIGHT)))
+
+    def test_the_raft_wall_can_be_off(self):
+        doc = json.loads(json.dumps(DOCUMENT))
+        doc["recipe"]["options"]["raftWall"] = False
+        v, t = supports.build(doc)
+        self.assertFalse(np.any(np.isclose(v[:, 2], 0.5 + supports.RAFT_WALL_HEIGHT)))
+        self.assertTrue(closed_and_outward(v, t))
+
+    def test_one_raft_for_all_comes_from_the_scene(self):
+        doc = json.loads(json.dumps(DOCUMENT))
+        doc["recipe"]["options"]["oneRaft"] = True
+        self.assertIsNone(supports.shapes(doc).raft)
 
     def test_no_raft_when_the_document_has_none(self):
         doc = json.loads(json.dumps(DOCUMENT))
