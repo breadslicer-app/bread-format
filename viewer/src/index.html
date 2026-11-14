@@ -14,6 +14,7 @@
 		<script type="module" src="parts.js"></script>
 		<script type="module" src="download.js"></script>
 		<script type="module" src="supports.js"></script>
+		<script type="module" src="compare.js"></script>
 	</head>
 	<body>
 		<header class="bar">
@@ -39,11 +40,16 @@
 					<p class="hint" data-text="controls">Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.</p>
 					<p class="hint more"><span data-text="caliper">To repair meshes, and more, Caliper opens and saves .bread:</span> <a href="https://caliper.synrgs.tech" target="_blank" rel="noopener">caliper.synrgs.tech</a></p>
 				</div>
+				<div id="label-stl" class="view-label" hidden></div>
+				<div id="label-bread" class="view-label" hidden></div>
+				<div id="loupe-0" class="loupe-frame" hidden></div>
+				<div id="loupe-1" class="loupe-frame" hidden></div>
 				<div id="busy" class="busy" hidden><span class="spinner"></span><span id="busy-text"></span></div>
 				<div id="error" class="error" role="alert" hidden></div>
 			</div>
 			<aside id="panel" class="panel" hidden>
 				<section id="converted" hidden></section>
+				<section id="compare" hidden></section>
 				<section id="file-info"></section>
 				<section id="supports" hidden></section>
 				<section id="parts"></section>

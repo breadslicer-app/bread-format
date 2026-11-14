@@ -174,3 +174,70 @@ test('placed sizes are in millimetres, in world positions', () => {
 	const turned = Float64Array.of(0, 2, 0, 0, -2, 0, 0, 0, 0, 0, 2, 0, 5, 5, 5, 1);
 	assert.deepEqual(core.placedSize(cube, turned), [4, 2, 6]);
 });
+
+test('side by side reads an STL straight from its bytes', () => {
+	const stl = binaryStl(TETRA);
+	assert.equal(core.binaryStlTriangles(stl), 3);
+	assert.equal(core.binaryStlTriangles(stl.subarray(0, stl.length - 1)), null, 'a size that does not fit its count');
+	const corners = core.stlCorners(stl);
+	assert.deepEqual(Array.from(corners), TETRA.flat(2).map(Math.fround));
+	// -0 keeps its sign bit: every number has the file's bits.
+	assert.equal(new Uint32Array(corners.buffer)[17], 0x80000000);
+	const triangle = core.stlTriangle(stl, 2);
+	assert.deepEqual(triangle.corners[2].values, [0.1, 0.2, 7.25].map(Math.fround));
+	assert.equal(core.bitsText(triangle.corners[2].bits[2]), '0x40E80000');
+});
+
+test('side by side finds the same triangle, corner by corner, in the .bread file', () => {
+	const stl = binaryStl(TETRA);
+	const result = core.convertStl(writer, [{ name: 'a.stl', bytes: stl }]);
+	const mesh = core.openBread(reader, result.file).meshes[0];
+	for (let i = 0; i < 3; i++) {
+		const left = core.stlTriangle(stl, i).corners.map((c) => c.bits);
+		const right = core.meshTriangle(mesh, i).corners.map((c) => c.bits);
+		assert.deepEqual(right, left);
+	}
+	// Two corners of the STL that are one vertex in the .bread file.
+	assert.equal(core.meshTriangle(mesh, 0).corners[0].vertex, core.meshTriangle(mesh, 1).corners[0].vertex);
+});
+
+test('the numbers are written as the shortest decimal of their f32', () => {
+	assert.equal(core.f32Text(Math.fround(0.1)), '0.1');
+	assert.equal(core.f32Text(Math.fround(7.25)), '7.25');
+	assert.equal(core.f32Text(Math.fround(1 / 3)), '0.33333334');
+	assert.equal(core.f32Text(-0), '-0');
+	assert.equal(core.f32Text(NaN), 'NaN');
+	for (const x of [Math.fround(123.456), Math.fround(-1e-7), Math.fround(3.4e38)]) {
+		assert.equal(Math.fround(Number(core.f32Text(x))), x);
+	}
+});
+
+test('the grid finds the triangles near a point', () => {
+	// A strip of 1,000 triangles along X, one millimetre each.
+	const strip = [];
+	for (let i = 0; i < 1000; i++) {
+		strip.push([
+			[i, 0, 0],
+			[i + 1, 0, 0],
+			[i, 1, 0],
+		]);
+	}
+	const grid = core.triangleGrid(binaryStl(strip));
+	const near = core.nearTriangles(grid, [500.3, 0.3, 0], 2.5).sort((a, b) => a - b);
+	// Centres at x = i + 1/3: within 2.5 of 500.3 are 498 to 502.
+	assert.deepEqual(near, [498, 499, 500, 501, 502]);
+	assert.equal(core.nearTriangles(grid, [500, 0, 0], 400, 100), null, 'more than the limit');
+	assert.deepEqual(core.nearTriangles(grid, [5000, 0, 0], 2), []);
+});
+
+test('a ray meets a triangle from either side', () => {
+	const [a, b, c] = [
+		[0, 0, 0],
+		[10, 0, 0],
+		[0, 10, 0],
+	];
+	assert.equal(core.rayTriangle([2, 2, 5], [0, 0, -1], a, b, c), 5);
+	assert.equal(core.rayTriangle([2, 2, -5], [0, 0, 1], a, b, c), 5);
+	assert.equal(core.rayTriangle([20, 20, 5], [0, 0, -1], a, b, c), null);
+	assert.equal(core.rayTriangle([2, 2, 5], [0, 0, 1], a, b, c), null, 'behind the eye');
+});

@@ -366,6 +366,13 @@ what = "converting it in the browser, the bit-for-bit check of every corner incl
 source = "same measurement (2,378 ms)"
 date = 2026-11-12
 
+[facts.viewer_compare_max_triangles]
+value = 8000000
+unit = "triangles"
+what = "the most triangles the viewer shows side by side, STL and .bread: both copies are on the graphics card"
+source = "viewer/src/compare.js, MAX_TRIANGLES"
+date = 2026-11-13
+
 [facts.viewer_open_ms]
 value = 310
 unit = "ms"

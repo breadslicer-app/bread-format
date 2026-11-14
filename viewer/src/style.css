@@ -384,6 +384,102 @@ canvas:active {
 	pointer-events: none;
 }
 
+/* Side by side: a label over each view, the loupe's frames, and the bits. */
+.view-label {
+	position: absolute;
+	padding: 3px 8px;
+	border-radius: var(--radius);
+	background: rgb(17 19 21 / 0.8);
+	border: 1px solid var(--border);
+	color: var(--text-soft);
+	font-size: 12px;
+	pointer-events: none;
+	max-width: calc(50% - 20px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.loupe-frame {
+	position: absolute;
+	border: 2px solid var(--accent);
+	border-radius: var(--radius);
+	pointer-events: none;
+}
+
+.compare-button {
+	margin-top: 8px;
+}
+
+.zoom {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+	margin: 10px 0;
+}
+
+.zoom-label {
+	color: var(--text-muted);
+	margin-right: 4px;
+}
+
+.button.small {
+	padding: 2px 7px;
+	font-size: 12px;
+}
+
+.button[aria-pressed='true'] {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+
+.triangle-head {
+	margin: 10px 0 4px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.corner-head {
+	margin: 10px 0 3px;
+	color: var(--text-soft);
+	font-size: 12px;
+}
+
+.bits {
+	display: grid;
+	grid-template-columns: auto 1fr auto auto auto;
+	gap: 2px 8px;
+	align-items: baseline;
+	font: 12px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+	font-variant-numeric: tabular-nums;
+}
+
+.bits-head {
+	color: var(--text-muted);
+	font: 11px/1.4 system-ui, sans-serif;
+}
+
+.bits .axis {
+	color: var(--text-muted);
+}
+
+.bits .value {
+	overflow-wrap: anywhere;
+}
+
+.bits .mark.ok {
+	color: var(--success);
+}
+
+.bits .differ {
+	color: var(--danger);
+}
+
+#compare .button.wide {
+	margin-top: 12px;
+}
+
 [hidden] {
 	display: none !important;
 }

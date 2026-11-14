@@ -111,7 +111,11 @@ export async function convertFiles(files) {
 	// download keeps the file.
 	await openBytes(name, result.file.slice());
 	showResult(name, result);
+	for (const listener of convertedListeners) listener(files, result);
 }
+
+/** Called after each conversion, with the STL files and what came out. */
+export const convertedListeners = [];
 
 fileHandlers.push({
 	accepts: (files) => files.length >= 1 && files.every((f) => /\.stl$/i.test(f.name)),

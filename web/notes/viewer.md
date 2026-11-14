@@ -1,7 +1,7 @@
 ---
 title: The viewer and converter
 status: stable
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 A page that opens `.bread` files and turns STL into `.bread`, in the browser, online at `/viewer/`
@@ -19,6 +19,13 @@ behind it.
 - **Check every conversion before offering it.** The new file is read back, and every corner of
   every triangle is compared, bit for bit, with the STL it came from. A file that does not give the
   STL back exactly is not offered. Then the page opens it, so what is shown is what was written.
+- **Side by side**, after converting a binary STL: the STL and the `.bread` file next to each other,
+  moved by one camera. The STL is read straight from its bytes, without the format's code; the
+  `.bread` file is the one just written, opened as any reader opens it. A loupe under the pointer, or
+  a tap, shows the same place on both sides magnified, each side's wireframe drawn from its own data,
+  and the panel shows the triangle there, corner by corner, as decimals and as the bits of each
+  number: the same on both sides. Up to `viewer_compare_max_triangles` triangles, since both copies
+  have to fit in the graphics card.
 - **Parts:** each part's name, triangles and size in millimetres, shown or hidden on its own.
 - **Download as STL**, the parts shown or one of them, for programs that do not read `.bread` yet.
 - **Supports:** a file's support previews, in the support colour, with a switch to hide them.

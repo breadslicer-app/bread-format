@@ -14,6 +14,15 @@ WebAssembly, so it makes the same checks as every other reader.
   mesh is compared with what was read from its STL, and every corner of a binary STL with the STL's
   own bytes, bit for bit. Then the page opens it, so what is shown is what was written, and offers
   it to download with its size before and after.
+- **Side by side**, after converting binary STL: the STL on the left and the `.bread` file on the
+  right (one above the other on a screen taller than wide), turned, moved and zoomed by one camera.
+  The STL side is read on the page straight from the file's bytes, without the format's code; the
+  `.bread` side is the file just written, opened as any reader opens it. Triangles keep their
+  order, so triangle *i* is the same on both. Under the pointer (or a tap) a loupe shows that place
+  4 to 64 times larger on both sides, with each side's wireframe drawn from its own data and the
+  triangle there lit; the panel shows that triangle's corners on both sides, as decimals and as the
+  32 bits of each `f32`, and the STL's facet normal, which `.bread` does not store. Up to 8 million
+  triangles, since both copies are on the graphics card; Escape goes back to one view.
 - **Parts:** every leaf shown, with its name, its triangles and its size in millimetres in world
   positions; each can be shown or hidden, and lights up in amber while the pointer is over it.
 - **Download as STL**, for programs that do not read `.bread` yet: the parts shown as one binary
@@ -37,7 +46,7 @@ The page is in English, and in Spanish for a browser that asks for it.
 
 It has no dependencies. The reading module (`bread.wasm`, about 77 KB with brotli) loads with the
 page; the writing module (`bread-write.wasm`, about 171 KB) only when STL files first come in.
-`src/convert.js` is the converter's part of the page, `src/parts.js` the parts panel, `src/download.js` the STL download, and `src/supports.js` the support previews.
+`src/convert.js` is the converter's part of the page, `src/parts.js` the parts panel, `src/download.js` the STL download, `src/supports.js` the support previews, and `src/compare.js` the side-by-side comparison. Its triangle under the pointer is found on the graphics card: the STL's triangles drawn, numbered, into one pixel.
 
 ## Building and trying it
 
