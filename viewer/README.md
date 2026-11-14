@@ -24,7 +24,7 @@ WebAssembly, so it makes the same checks as every other reader.
   32 bits of each `f32`, and the STL's facet normal, which `.bread` does not store. Up to 8 million
   triangles, since both copies are on the graphics card; Escape goes back to one view.
 - **Parts:** every leaf shown, with its name, its triangles and its size in millimetres in world
-  positions; each can be shown or hidden, and lights up in amber while the pointer is over it.
+  positions; each can be shown or hidden, and lights up in the format's tone while the pointer is over it.
 - **Download as STL**, for programs that do not read `.bread` yet: the parts shown as one binary
   STL, or one part, in world positions (each vertex moved by its leaf's transform in `f64`, then
   rounded to `f32`). A transform that mirrors keeps the faces facing out.
@@ -38,7 +38,8 @@ The page is in English, and in Spanish for a browser that asks for it.
 
 | File | What it does |
 |---|---|
-| `src/index.html`, `src/style.css` | the page, in Breadslicer's colours |
+| `src/index.html`, `src/style.css` | the page, in the look of bread.synrgs.tech: its colours, Archivo and JetBrains Mono |
+| `src/fonts/` | the two fonts, both under the SIL Open Font License (`OFL.txt` beside them) |
 | `src/app.js` | the page's behaviour: files in, the panel, the words in both languages |
 | `src/render.js` | a small WebGL2 renderer: flat shading worked out in the fragment shader, so a mesh of millions of triangles needs no normals or extra copy; the grid; the orbit camera |
 | `src/worker.js` | reads and writes in a Web Worker, so the page never freezes on a large file |
@@ -58,6 +59,6 @@ npm run serve                      # http://localhost:8080
 ```
 
 `viewer/dist` is the whole page: its files, the package as `bread.js`, the modules, and the
-`NOTICE` and `LICENSE` that go with them. It can be served as static files from any address; module
-workers and WebAssembly need http, not `file://`. `.wasm` files should be served as
-`application/wasm`.
+`NOTICE` and `LICENSE` that go with them, and the fonts in `fonts/` with their `OFL.txt`. It can be
+served as static files from any address; module workers and WebAssembly need http, not `file://`.
+`.wasm` files should be served as `application/wasm`, and `.woff2` as `font/woff2`.

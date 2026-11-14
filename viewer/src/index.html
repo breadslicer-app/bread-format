@@ -18,7 +18,7 @@
 	</head>
 	<body>
 		<header class="bar">
-			<h1><a class="home" href="https://bread.synrgs.tech/" title="bread.synrgs.tech"><span class="brand">.bread</span></a> <span data-text="title">viewer</span></h1>
+			<h1><a class="home" href="https://bread.synrgs.tech/" title="bread.synrgs.tech"><span class="brand"><span class="dot">.</span>bread</span></a> <span class="sub" data-text="title">viewer</span></h1>
 			<div class="actions">
 				<label class="button">
 					<span data-text="convert">STL to .bread</span>
@@ -28,17 +28,21 @@
 					<span data-text="open">Open .bread</span>
 					<input id="open" type="file" accept=".bread" hidden />
 				</label>
+				<a class="back" href="https://bread.synrgs.tech/">bread.synrgs.tech ↗</a>
 			</div>
 		</header>
 		<main>
 			<div class="stage">
 				<canvas id="view" aria-label="3D view"></canvas>
 				<div id="empty" class="empty">
-					<p class="lead" data-text="emptyLead">Drop a .bread file here to look at it.</p>
-					<p class="hint" data-text="emptyConvert">Or drop STL files to turn them into one .bread file, checked bit for bit.</p>
-					<p class="hint" data-text="private">It all runs in your browser: your files never leave your computer.</p>
-					<p class="hint" data-text="controls">Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.</p>
-					<p class="hint more"><span data-text="caliper">To repair meshes, and more, Caliper opens and saves .bread:</span> <a href="https://caliper.synrgs.tech" target="_blank" rel="noopener">caliper.synrgs.tech</a></p>
+					<div class="frame">
+						<p class="label" data-text="emptyLabel">Viewer · .bread</p>
+						<p class="lead" data-text="emptyLead">Drop a .bread file here to look at it.</p>
+						<p class="hint" data-text="emptyConvert">Or drop STL files to turn them into one .bread file, checked bit for bit.</p>
+						<p class="hint" data-text="private">It all runs in your browser: your files never leave your computer.</p>
+						<p class="hint" data-text="controls">Drag to turn · right drag or shift to move · wheel to zoom · double click to frame.</p>
+						<p class="hint more"><span data-text="caliper">To repair meshes, and more, Caliper opens and saves .bread:</span> <a href="https://caliper.synrgs.tech" target="_blank" rel="noopener">caliper.synrgs.tech</a></p>
+					</div>
 				</div>
 				<div id="label-stl" class="view-label" hidden></div>
 				<div id="label-bread" class="view-label" hidden></div>

@@ -84,19 +84,24 @@ void main() {
 	outId = id;
 }`;
 
-/** Colours, as Breadslicer draws them. */
+/**
+ * Colours. The scene in the page's graphite: the ground, grid lines in the
+ * page's line colours, quiet axes so they do not compete with the model; the
+ * model and the supports as Breadslicer draws them; what is selected in the
+ * format's tone.
+ */
 export const COLORS = {
-	ground: [0x11 / 255, 0x13 / 255, 0x15 / 255],
+	ground: [0x11 / 255, 0x12 / 255, 0x14 / 255],
 	model: [0.82, 0.82, 0.8],
 	support: [0.38, 0.44, 0.53],
-	selected: [0xe2 / 255, 0xa7 / 255, 0x50 / 255],
-	gridMinor: [0x1c / 255, 0x20 / 255, 0x24 / 255],
-	gridMajor: [0x2c / 255, 0x33 / 255, 0x39 / 255],
-	axisX: [0.75, 0.32, 0.32],
-	axisY: [0.36, 0.68, 0.45],
-	gap: [0x27 / 255, 0x2d / 255, 0x32 / 255],
-	loupe: [0x0b / 255, 0x0d / 255, 0x0f / 255],
-	edge: [0.62, 0.67, 0.72],
+	selected: [0xd7 / 255, 0xa7 / 255, 0x5a / 255],
+	gridMinor: [0x2b / 255, 0x2d / 255, 0x30 / 255],
+	gridMajor: [0x3d / 255, 0x40 / 255, 0x44 / 255],
+	axisX: [0x8a / 255, 0x62 / 255, 0x5e / 255],
+	axisY: [0x5f / 255, 0x7d / 255, 0x69 / 255],
+	gap: [0x2b / 255, 0x2d / 255, 0x30 / 255],
+	loupe: [0x0c / 255, 0x0d / 255, 0x0e / 255],
+	edge: [0.62, 0.64, 0.66],
 };
 
 /** The loupe's side in a view: as asked, but never more than 60% of the view's shorter side. */

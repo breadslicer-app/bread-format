@@ -3,7 +3,7 @@
 
 // The parts panel: every leaf the scene shows, with its name, its triangles
 // and its size in millimetres, each shown or hidden on its own and lit in the
-// amber of selection while the pointer is over it.
+// format's tone while the pointer is over it.
 
 import { addWords, openListeners, refresh, state, t as translate } from './app.js';
 import { COLORS } from './render.js';
