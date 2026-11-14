@@ -1,0 +1,24 @@
+schema_version = "1.0.0"
+
+id = "bread_import"
+version = "0.1.0"
+name = "Bread (.bread) importer"
+tagline = "Open .bread files: models, hollows and supports"
+maintainer = "SynrgStudio"
+type = "add-on"
+website = "https://bread.synrgs.tech"
+tags = ["Import-Export"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 SynrgStudio"]
+
+# The .bread reader is a native library, built for each platform.
+platforms = ["windows-x64"]
+
+[permissions]
+files = "Import .bread files from disk"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc", ".gitignore"]
