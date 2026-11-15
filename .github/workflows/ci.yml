@@ -11,6 +11,9 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
+  # Bread Converter's window finds fontconfig on Linux when it runs, so the
+  # build needs no fontconfig headers.
+  RUST_FONTCONFIG_DLOPEN: "on"
 jobs:
   fmt:
     runs-on: ubuntu-latest

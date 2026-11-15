@@ -29,6 +29,9 @@ cargo build --release -p bread-converter    # target/release/bread-converter(.ex
 cargo test -p bread-converter
 ```
 
+On Linux the window needs fontconfig: its development files to build, or `RUST_FONTCONFIG_DLOPEN=on`
+to load it when the program runs, as CI does.
+
 The tests cover the queue without the window: which files folders give, where each goes, what
 happens when a file is there, and the conversions both ways.
 
