@@ -11,6 +11,10 @@ checked exactly as `bread from-stl` and `bread to-stl` do it.
 - **Convert** both ways, each file by its extension, or only STL to `.bread`, or only `.bread` to
   STL. Every `.bread` file is read back and checked bit for bit against its STL before it is
   written; one that fails the check is not written.
+- **Export** as it converts, or **convert only**: each file is converted and checked in memory and
+  nothing is written, to see how much room the files would take, what they save, and how much is
+  free where they would go. **Export** then writes them as set: from memory, up to 1 GB kept, and
+  converting the rest again. It can be pressed again to write them somewhere else.
 - **Write** next to each file, or into a folder, keeping the subfolders the files were found in
   or not.
 - **If the file is there:** skip it, replace it, or keep both (`name (2).bread`). Two files never
@@ -35,7 +39,8 @@ On Linux the window links fontconfig: building needs its development files
 (`libfontconfig1-dev` on Debian and Ubuntu), as CI installs them.
 
 The tests cover the queue without the window: which files folders give, where each goes, what
-happens when a file is there, and the conversions both ways.
+happens when a file is there, the conversions both ways, converting in memory and writing
+later, and the free room.
 
 The window is `ui/app.slint`, on `ui/kit/`: Breadslicer's design tokens (`theme.slint`), controls,
 dialog pieces and icons, as Breadslicer has them. The Spanish texts are in `tools/translate_es.py`;
