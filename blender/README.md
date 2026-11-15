@@ -26,7 +26,8 @@ It needs Blender 4.2 or later, and has been tried on Blender 5.2.
   reads which leaves are models, hollows and supports.
 - `bread_import/supports.py` builds the supports. Breadslicer's supports document (generator `df`,
   versions 1 and 2) already says where each piece goes and how big it is, so nothing here decides
-  where supports go: each base becomes a disk with a cone up to its trunk; each stretch between
+  where supports go: each base becomes a disk with a cone up to its trunk, or, on a raft, a small
+foot a little wider than a line of a line raft, as Breadslicer draws it; each stretch between
   joints a cylinder; each joint and knot a ball; each tip a thin disk on the model and a cone to
   the support; each brace a cylinder from knot to knot; and the raft, when there is one, a plate
   under the bases, sloped underneath, with a low wall along its edge that has gaps for resin to

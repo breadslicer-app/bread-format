@@ -9,7 +9,9 @@ branches as chains of joints, the tips where they touch the model, the knots
 where one piece leaves another, and the braces between knots. Nothing here
 decides where supports go: it only gives each piece a shape.
 
-- a base is a disk, with a cone that joins it to its trunk;
+- a base is a disk, with a cone that joins it to its trunk; on a raft, a
+  small foot instead: a pad a little wider than a line of a line raft and a
+  cone up to the trunk, since the raft already holds the supports down;
 - a stretch between two joints is a cylinder, and each joint and knot a ball;
 - a tip is a thin disk on the model and a cone from it to the support;
 - a brace is a cylinder from knot to knot;
@@ -192,6 +194,14 @@ RAFT_WALL_HEIGHT = 0.35
 RAFT_WALL_THICKNESS = 0.5
 RAFT_WALL_GAP = 1.5
 RAFT_WALL_SPACING = 5.0
+# How tall a line of a line raft is, and how wide.
+RAFT_LINE_HEIGHT = 0.6
+RAFT_LINE_WIDTH = 1.5
+# On a raft each base is a foot this much wider than a line.
+RAFT_FOOT_SPREAD = 1.15
+# How far past the sloped edge and the wall the raft reaches.
+RAFT_MARGIN = 0.2
+RAFT_OFF = (None, "none", "off", False)
 
 
 def _inset(poly: np.ndarray, d: float) -> np.ndarray:
@@ -239,7 +249,7 @@ def _raft_mesh(bases: list[tuple], thickness: float, wall: bool):
     sloped edge and the wall."""
     t = np.arange(32) * (2 * math.pi / 32)
     ring = np.stack([np.cos(t), np.sin(t)], 1)
-    margin = thickness + (RAFT_WALL_THICKNESS if wall else 0.0)
+    margin = RAFT_MARGIN + max(thickness, RAFT_WALL_THICKNESS if wall else 0.0)
     pts = np.concatenate([c[None, :2] + (r + margin) * ring for c, r in bases])
     floor = min(c[2] for c, _ in bases)
     top = _hull(pts)
@@ -309,6 +319,14 @@ def shapes(document: dict) -> Shapes:
     knots = {k.get("id"): k for k in coll("knots")}
     roots = {r.get("id"): r for r in coll("roots")}
 
+    # With one raft for every model ("oneRaft"), Breadslicer makes it of
+    # lines and keeps it as a mesh of the scene, so the supports bring none of
+    # their own; their bases stand on it all the same.
+    options = (document.get("recipe") or {}).get("options") or {}
+    mode = "lines" if options.get("oneRaft") else options.get("raft")
+    on_raft = mode not in RAFT_OFF
+    raft_height = RAFT_LINE_HEIGHT if mode == "lines" else _num(options, "raftThicknessMm")
+
     def knot_pos(knot_id):
         return _vec(knots.get(knot_id, {}).get("pos"))
 
@@ -354,6 +372,16 @@ def shapes(document: dict) -> Shapes:
         disk = _num(r, "diskHeight")
         cone = _num(r, "coneHeight")
         trunk = trunk_radius.get(r.get("id"), radius / 4)
+        if on_raft:
+            # A pad as tall as the raft and a 45° cone up to the trunk, which
+            # starts inside the pad.
+            foot = max(trunk, RAFT_LINE_WIDTH / 2 * RAFT_FOOT_SPREAD)
+            pad = max(0.01, raft_height)
+            rise = max(0.05, foot - trunk)
+            out.cylinder(pos, pos + up * pad, foot)
+            out.cylinder(pos + up * pad, pos + up * (pad + rise), foot, trunk)
+            bases.append((pos, foot))
+            continue
         out.cylinder(pos, pos + up * disk, radius)
         top = pos + up * disk
         if cone > 0:
@@ -361,7 +389,7 @@ def shapes(document: dict) -> Shapes:
             top = top + up * cone
         join = _num(r, "joinConeMm")
         if join > 0:
-            out.cylinder(top, top + up * join, min(2 * trunk, radius), trunk)
+            out.cylinder(top, top + up * join, min(trunk + join, radius), trunk)
         bases.append((pos, radius))
 
     def chain(piece, start=None, end=None):
@@ -463,17 +491,10 @@ def shapes(document: dict) -> Shapes:
     for k in knots.values():
         out.ball(_vec(k.get("pos")), _num(k, "diameter") / 2)
 
-    options = (document.get("recipe") or {}).get("options") or {}
-    thickness = _num(options, "raftThicknessMm")
-    # With one raft for every model ("oneRaft"), Breadslicer keeps that raft
-    # as a mesh of the scene, so the supports bring none of their own.
-    if (
-        options.get("raft") not in (None, "none", "off", False)
-        and not options.get("oneRaft")
-        and thickness > 0
-        and bases
-    ):
-        out.raft = (bases, thickness, options.get("raftWall") is not False)
+    # A line raft of a set's own is drawn solid: the document does not keep
+    # where its lines go.
+    if on_raft and not options.get("oneRaft") and raft_height > 0 and bases:
+        out.raft = (bases, raft_height, options.get("raftWall") is not False)
     return out
 
 

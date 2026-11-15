@@ -118,7 +118,7 @@ class Build(unittest.TestCase):
 
     def test_shapes_follow_the_document(self):
         s = supports.shapes(DOCUMENT)
-        # disk + join cone, two trunk stretches, tip disk and cone, branch
+        # foot pad and cone, two trunk stretches, tip disk and cone, branch
         # stretch, branch tip (2), leaf tip (2), brace.
         self.assertEqual(len(s.cylinders), 2 + 2 + 2 + 1 + 2 + 2 + 1)
         # three joints and two knots
@@ -140,12 +140,13 @@ class Build(unittest.TestCase):
     def test_the_raft_lies_under_the_bases(self):
         v, _ = supports.build(DOCUMENT)
         self.assertAlmostEqual(float(v[:, 2].min()), 0.0)
-        # Its top reaches past the base (2.5) by the slope (0.5) and the wall
-        # (0.5); its floor is 0.5 in, under the slope.
+        # Its top reaches past the base's foot (0.8625) by the margin (0.2)
+        # and the slope or the wall, the wider (0.5); its floor is 0.5 in,
+        # under the slope.
         floor = v[np.isclose(v[:, 2], 0.0)]
-        self.assertAlmostEqual(float(np.abs(floor[:, :2]).max()), 3.0, delta=0.05)
+        self.assertAlmostEqual(float(np.abs(floor[:, :2]).max()), 1.0625, delta=0.05)
         top = v[np.isclose(v[:, 2], 0.5)]
-        self.assertAlmostEqual(float(np.abs(top[:, :2]).max()), 3.5, places=4)
+        self.assertAlmostEqual(float(np.abs(top[:, :2]).max()), 1.5625, places=4)
         # The wall stands on top of it.
         self.assertTrue(np.any(np.isclose(v[:, 2], 0.5 + supports.RAFT_WALL_HEIGHT)))
 
@@ -189,8 +190,30 @@ class Build(unittest.TestCase):
         with self.assertRaises(supports.SupportsError):
             supports.read_document("df", 2, b"\xff")
 
+    def test_on_a_raft_a_base_is_a_small_foot(self):
+        foot = supports.RAFT_LINE_WIDTH / 2 * supports.RAFT_FOOT_SPREAD
+        cases = [("solid", False, 0.5), ("lines", False, supports.RAFT_LINE_HEIGHT),
+                 ("solid", True, supports.RAFT_LINE_HEIGHT)]
+        for raft, one, height in cases:
+            with self.subTest(raft=raft, one_raft=one):
+                doc = json.loads(json.dumps(DOCUMENT))
+                doc["recipe"]["options"].update(raft=raft, oneRaft=one)
+                pad, cone = supports.shapes(doc).cylinders[:2]
+                self.assertTrue(np.allclose(pad[1] - pad[0], [0, 0, height]))
+                self.assertAlmostEqual(pad[2], foot)
+                # 45° up to the trunk.
+                self.assertAlmostEqual(cone[1][2] - cone[0][2], foot - 0.55)
+                self.assertAlmostEqual(cone[3], 0.55)
+        # Without a raft, the base's own disk and a 45° join cone.
+        doc = json.loads(json.dumps(DOCUMENT))
+        doc["recipe"]["options"]["raft"] = "off"
+        disk, join = supports.shapes(doc).cylinders[:2]
+        self.assertAlmostEqual(disk[2], 2.5)
+        self.assertAlmostEqual(join[2], 0.55 + 0.4)
+
     def test_turned_bases_stand_on_their_axis(self):
         doc = json.loads(json.dumps(DOCUMENT))
+        doc["recipe"]["options"]["raft"] = "off"
         half = math.sqrt(0.5)
         doc["state"]["roots"]["r"]["transform"]["rot"] = {"x": half, "y": 0, "z": 0, "w": half}
         s = supports.shapes(doc)
