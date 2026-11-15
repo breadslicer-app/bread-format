@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -55,6 +55,7 @@ struct Tally {
 }
 
 struct Run {
+    kind: Kind,
     stop: Arc<AtomicBool>,
     tally: Arc<Mutex<Tally>>,
     started: Instant,
@@ -68,6 +69,8 @@ struct App {
     rows: Rc<VecModel<JobRow>>,
     settings: Settings,
     run: Option<Run>,
+    /// What the last measuring run made of each file, by the list's order.
+    made: Vec<Option<Made>>,
     /// The folder to open after a run.
     last_output: Option<PathBuf>,
 }
@@ -103,6 +106,7 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.set_output_folder(settings.output_folder.clone().into());
     ui.set_keep_tree(settings.keep_tree);
     ui.set_when_there(settings.when_there);
+    ui.set_export_mode(settings.export_mode);
     let rows = Rc::new(VecModel::<JobRow>::default());
     ui.set_jobs(ModelRc::from(rows.clone()));
     APP.with(|a| {
@@ -112,6 +116,7 @@ fn main() -> Result<(), slint::PlatformError> {
             rows,
             settings,
             run: None,
+            made: Vec::new(),
             last_output: None,
         });
     });
@@ -149,7 +154,13 @@ fn main() -> Result<(), slint::PlatformError> {
         app(App::clear);
     });
     ui.on_convert(|| {
-        app(App::start);
+        app(|a| {
+            let measure = a.ui.upgrade().is_some_and(|ui| ui.get_export_mode() == 1);
+            a.start(if measure { Kind::Measure } else { Kind::Write });
+        });
+    });
+    ui.on_export(|| {
+        app(|a| a.start(Kind::Export));
     });
     ui.on_cancel(|| {
         app(|a| {
@@ -380,12 +391,63 @@ fn row(job: &Job) -> JobRow {
     }
 }
 
+/// What a run does with each file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    /// Converts it and writes it.
+    Write,
+    /// Converts it in memory only, to see how much room it would take.
+    Measure,
+    /// Writes what a measuring run made: kept in memory, or made again.
+    Export,
+}
+
+/// What a measuring run made of a file: its size, and its bytes when they
+/// fitted in what is kept in memory.
+struct Made {
+    size: u64,
+    bytes: Option<Arc<Vec<u8>>>,
+}
+
+/// How much a measuring run keeps in memory for Export, at most: what does
+/// not fit is converted again when it is exported.
+const KEEP_IN_MEMORY: u64 = 1 << 30;
+
+/// A file of a run: its row, the job, where it goes (none when only
+/// measured), and what a measuring run kept of it.
+struct Work {
+    i: usize,
+    job: Job,
+    out: Option<PathBuf>,
+    kept: Option<Arc<Vec<u8>>>,
+}
+
+/// How a file of a run ended: the size made, where it went, and what is kept
+/// of it in memory; or why it failed.
+type Outcome = Result<(u64, Option<PathBuf>, Option<Arc<Vec<u8>>>), String>;
+
 impl App {
     fn direction(ui: &AppWindow) -> Direction {
         match ui.get_direction() {
             1 => Direction::ToBread,
             2 => Direction::ToStl,
             _ => Direction::Both,
+        }
+    }
+
+    /// Where files go, as the window says, or `None` when it names no folder.
+    fn output(ui: &AppWindow) -> Option<Output> {
+        if ui.get_output_mode() == 1 {
+            let dir = ui.get_output_folder().trim().to_owned();
+            if dir.is_empty() {
+                return None;
+            }
+            Some(Output::Folder {
+                dir: PathBuf::from(dir),
+                keep_tree: ui.get_keep_tree(),
+            })
+        } else {
+            Some(Output::NextTo)
         }
     }
 
@@ -401,14 +463,24 @@ impl App {
         ui.set_notice(if new.is_empty() { 1 } else { 0 });
         // A list run before starts again.
         if ui.get_phase() >= 2 {
-            self.reset_rows();
-            ui.set_phase(0);
+            self.forget(&ui);
         }
         for job in new {
             self.rows.push(row(&job));
             self.jobs.push(job);
+            self.made.push(None);
         }
         self.show_count(&ui);
+    }
+
+    /// Forgets the last run: rows back to waiting, nothing kept to export.
+    fn forget(&mut self, ui: &AppWindow) {
+        self.reset_rows();
+        self.made = self.jobs.iter().map(|_| None).collect();
+        ui.set_phase(0);
+        ui.set_can_export(false);
+        ui.set_short_of_room(false);
+        ui.set_progress(0.0);
     }
 
     fn show_count(&self, ui: &AppWindow) {
@@ -427,11 +499,11 @@ impl App {
             return;
         }
         self.jobs.clear();
+        self.made.clear();
         self.rows.set_vec(Vec::new());
         if let Some(ui) = self.ui.upgrade() {
-            ui.set_phase(0);
+            self.forget(&ui);
             ui.set_notice(0);
-            ui.set_progress(0.0);
             self.show_count(&ui);
         }
     }
@@ -446,28 +518,46 @@ impl App {
         self.settings.output_folder = ui.get_output_folder().to_string();
         self.settings.keep_tree = ui.get_keep_tree();
         self.settings.when_there = ui.get_when_there();
+        self.settings.export_mode = ui.get_export_mode();
         self.settings.save();
+        if ui.get_can_export() {
+            self.show_room(&ui);
+        }
     }
 
-    fn start(&mut self) {
+    /// How much room the files converted in memory would take, against the
+    /// room free where they would be written: in the output folder, or next
+    /// to the first of them.
+    fn show_room(&self, ui: &AppWindow) {
+        let needed: u64 = self.made.iter().flatten().map(|m| m.size).sum();
+        let first = self
+            .made
+            .iter()
+            .position(Option::is_some)
+            .and_then(|i| self.jobs[i].source.parent());
+        let place = match Self::output(ui) {
+            Some(Output::Folder { dir, .. }) => Some(dir),
+            _ => first.map(Path::to_path_buf),
+        };
+        let free = place.as_deref().and_then(queue::free_space);
+        ui.set_free_space(free.map(size).unwrap_or_else(|| "?".into()).into());
+        ui.set_short_of_room(free.is_some_and(|f| f < needed));
+    }
+
+    fn start(&mut self, kind: Kind) {
         let Some(ui) = self.ui.upgrade() else {
             return;
         };
         if self.run.is_some() || self.jobs.is_empty() {
             return;
         }
-        let output = if ui.get_output_mode() == 1 {
-            let dir = ui.get_output_folder().trim().to_owned();
-            if dir.is_empty() {
-                ui.set_notice(2);
-                return;
-            }
-            Output::Folder {
-                dir: PathBuf::from(dir),
-                keep_tree: ui.get_keep_tree(),
-            }
+        let output = if kind == Kind::Measure {
+            None
+        } else if let Some(output) = Self::output(&ui) {
+            Some(output)
         } else {
-            Output::NextTo
+            ui.set_notice(2);
+            return;
         };
         let when_there = match ui.get_when_there() {
             1 => WhenThere::Replace,
@@ -475,51 +565,82 @@ impl App {
             _ => WhenThere::Skip,
         };
         ui.set_notice(0);
-        self.reset_rows();
+        if kind != Kind::Export {
+            self.made = self.jobs.iter().map(|_| None).collect();
+        }
         let direction = Self::direction(&ui);
+        let this_way = |i: usize| queue::way_of(&self.jobs[i].source, direction).is_some();
+        // Export writes what was converted in memory, and only that.
         let wanted: Vec<usize> = (0..self.jobs.len())
-            .filter(|&i| queue::way_of(&self.jobs[i].source, direction).is_some())
+            .filter(|&i| this_way(i) && (kind != Kind::Export || self.made[i].is_some()))
             .collect();
-        let chosen: Vec<Job> = wanted.iter().map(|&i| self.jobs[i].clone()).collect();
-        let plans = queue::plan(&chosen, &output, when_there);
+        let plans = match &output {
+            Some(output) => {
+                let chosen: Vec<Job> = wanted.iter().map(|&i| self.jobs[i].clone()).collect();
+                queue::plan(&chosen, output, when_there)
+            }
+            None => Vec::new(),
+        };
 
         let mut tally = Tally::default();
         let mut work = Vec::new();
         for (i, job) in self.jobs.iter().enumerate() {
             let mut r = row(job);
-            match wanted.iter().position(|&w| w == i).map(|k| &plans[k]) {
-                None => {
-                    r.state = 3;
-                    r.reason = 2;
-                    tally.skipped += 1;
+            let Some(k) = wanted.iter().position(|&w| w == i) else {
+                // A file that failed when it was converted in memory keeps
+                // saying why.
+                if kind == Kind::Export && this_way(i) {
+                    continue;
                 }
+                r.state = 3;
+                r.reason = 2;
+                tally.skipped += 1;
+                self.rows.set_row_data(i, r);
+                continue;
+            };
+            match plans.get(k) {
+                None => work.push(Work {
+                    i,
+                    job: job.clone(),
+                    out: None,
+                    kept: None,
+                }),
                 Some(Plan::Skip(there)) => {
                     r.state = 3;
                     r.reason = 1;
                     // Inside the output folder, from there; else its name.
                     let shown = match &output {
-                        Output::Folder { dir, .. } => there.strip_prefix(dir).ok(),
-                        Output::NextTo => None,
+                        Some(Output::Folder { dir, .. }) => there.strip_prefix(dir).ok(),
+                        _ => None,
                     }
                     .or_else(|| there.file_name().map(Path::new))
                     .unwrap_or(there);
                     r.detail = shown.to_string_lossy().as_ref().into();
                     tally.skipped += 1;
                 }
-                Some(Plan::Write(out)) => work.push((i, job.clone(), out.clone())),
+                Some(Plan::Write(out)) => work.push(Work {
+                    i,
+                    job: job.clone(),
+                    out: Some(out.clone()),
+                    kept: self.made[i].as_ref().and_then(|m| m.bytes.clone()),
+                }),
             }
             self.rows.set_row_data(i, r);
         }
-        self.last_output = match &output {
-            Output::Folder { dir, .. } => Some(dir.clone()),
-            Output::NextTo => work
-                .first()
-                .and_then(|(_, _, out)| out.parent().map(Path::to_path_buf)),
-        };
-        let total: u64 = work.iter().map(|(_, j, _)| j.size).sum();
+        if kind != Kind::Measure {
+            self.last_output = match &output {
+                Some(Output::Folder { dir, .. }) => Some(dir.clone()),
+                _ => work
+                    .first()
+                    .and_then(|w| w.out.as_deref()?.parent().map(Path::to_path_buf)),
+            };
+        }
+        let total: u64 = work.iter().map(|w| w.job.size).sum();
         ui.set_run_count(i32::try_from(work.len()).unwrap_or(i32::MAX));
         ui.set_file_size(size(total).into());
         ui.set_can_open_output(false);
+        ui.set_can_export(false);
+        ui.set_short_of_room(false);
         ui.set_busy(true);
         ui.set_phase(1);
 
@@ -538,12 +659,13 @@ impl App {
         }
         show_tally(&ui, &tally.lock().unwrap(), total, started);
         self.run = Some(Run {
+            kind,
             stop: stop.clone(),
             tally: tally.clone(),
             started,
             _timer: timer,
         });
-        std::thread::spawn(move || convert_all(work, &stop, &tally));
+        std::thread::spawn(move || convert_all(work, kind, &stop, &tally));
     }
 
     fn started(&self, i: usize) {
@@ -553,22 +675,35 @@ impl App {
         }
     }
 
-    fn finished(&self, i: usize, size_before: u64, result: &Result<(u64, PathBuf), String>) {
+    fn finished(&mut self, i: usize, size_before: u64, outcome: Outcome) {
         let Some(mut r) = self.rows.row_data(i) else {
             return;
         };
-        match result {
-            Ok((written, out)) => {
-                r.state = 2;
-                r.reason = 4;
-                r.detail = out
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default()
-                    .into();
-                r.result = size(*written).into();
+        match outcome {
+            Ok((made, out, kept)) => {
+                match out {
+                    Some(out) => {
+                        r.state = 2;
+                        r.reason = 4;
+                        r.detail = out
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default()
+                            .into();
+                    }
+                    None => {
+                        r.state = 5;
+                        if let Some(slot) = self.made.get_mut(i) {
+                            *slot = Some(Made {
+                                size: made,
+                                bytes: kept,
+                            });
+                        }
+                    }
+                }
+                r.result = size(made).into();
                 #[expect(clippy::cast_precision_loss, reason = "a percentage to show")]
-                let ratio = 100.0 * *written as f64 / size_before.max(1) as f64;
+                let ratio = 100.0 * made as f64 / size_before.max(1) as f64;
                 r.ratio = if ratio < 10.0 {
                     format!("{ratio:.1}%")
                 } else if ratio < 1000.0 {
@@ -595,15 +730,30 @@ impl App {
             return;
         };
         let tally = run.tally.lock().unwrap();
-        // What was never started when it stopped goes back to waiting.
         let stopped = run.stop.load(Ordering::Relaxed);
         show_tally(&ui, &tally, 0, run.started);
         ui.set_busy(false);
-        ui.set_phase(if stopped { 3 } else { 2 });
-        ui.set_progress(if stopped { ui.get_progress() } else { 1.0 });
+        ui.set_phase(match (run.kind, stopped) {
+            (_, true) => 3,
+            (Kind::Measure, false) => 4,
+            _ => 2,
+        });
+        if !stopped {
+            ui.set_progress(1.0);
+        }
         ui.set_summary_before(size(tally.before).into());
         ui.set_summary_after(size(tally.after).into());
-        ui.set_can_open_output(tally.converted > 0 && self.last_output.is_some());
+        ui.set_grows(tally.after > tally.before);
+        ui.set_saved(size(tally.after.abs_diff(tally.before)).into());
+        // What was converted in memory can be written, now or again.
+        let can_export = self.made.iter().any(Option::is_some);
+        ui.set_can_export(can_export);
+        if can_export {
+            self.show_room(&ui);
+        }
+        ui.set_can_open_output(
+            run.kind != Kind::Measure && tally.converted > 0 && self.last_output.is_some(),
+        );
     }
 }
 
@@ -621,10 +771,11 @@ fn show_tally(ui: &AppWindow, t: &Tally, total: u64, started: Instant) {
     }
 }
 
-/// Converts `work` side by side, telling the window as each file starts and
-/// ends, until all are done or `stop` is set.
-fn convert_all(work: Vec<(usize, Job, PathBuf)>, stop: &AtomicBool, tally: &Mutex<Tally>) {
+/// Converts `work` side by side as `kind` says, telling the window as each
+/// file starts and ends, until all are done or `stop` is set.
+fn convert_all(work: Vec<Work>, kind: Kind, stop: &AtomicBool, tally: &Mutex<Tally>) {
     let next = AtomicUsize::new(0);
+    let kept_bytes = AtomicU64::new(0);
     let threads = std::thread::available_parallelism()
         .map_or(2, usize::from)
         .clamp(1, SIDE_BY_SIDE)
@@ -637,30 +788,46 @@ fn convert_all(work: Vec<(usize, Job, PathBuf)>, stop: &AtomicBool, tally: &Mute
                         break;
                     }
                     let k = next.fetch_add(1, Ordering::Relaxed);
-                    let Some((i, job, out)) = work.get(k) else {
+                    let Some(w) = work.get(k) else {
                         break;
                     };
-                    let i = *i;
+                    let i = w.i;
                     let _ = slint::invoke_from_event_loop(move || {
                         app(|a| a.started(i));
                     });
-                    let result = queue::convert(job, out).map(|n| (n, out.clone()));
+                    let outcome: Outcome = match (&w.out, &w.kept) {
+                        (None, _) => queue::make(&w.job).map(|bytes| {
+                            let n = bytes.len() as u64;
+                            let fits =
+                                kept_bytes.fetch_add(n, Ordering::Relaxed) + n <= KEEP_IN_MEMORY;
+                            if !fits {
+                                kept_bytes.fetch_sub(n, Ordering::Relaxed);
+                            }
+                            (n, None, fits.then(|| Arc::new(bytes)))
+                        }),
+                        (Some(out), Some(bytes)) => queue::write(bytes, out)
+                            .map(|()| (bytes.len() as u64, Some(out.clone()), None)),
+                        (Some(out), None) => {
+                            queue::convert(&w.job, out).map(|n| (n, Some(out.clone()), None))
+                        }
+                    };
+                    debug_assert!(kind == Kind::Measure || w.out.is_some());
                     {
                         let mut t = tally.lock().unwrap();
                         t.done += 1;
-                        t.bytes_done += job.size;
-                        match &result {
-                            Ok((n, _)) => {
+                        t.bytes_done += w.job.size;
+                        match &outcome {
+                            Ok((n, _, _)) => {
                                 t.converted += 1;
-                                t.before += job.size;
+                                t.before += w.job.size;
                                 t.after += n;
                             }
                             Err(_) => t.failed += 1,
                         }
                     }
-                    let before = job.size;
+                    let before = w.job.size;
                     let _ = slint::invoke_from_event_loop(move || {
-                        app(|a| a.finished(i, before, &result));
+                        app(|a| a.finished(i, before, outcome));
                     });
                 }
             });

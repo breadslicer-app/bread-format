@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 
 use bread_format::{read_file, read_stl};
 
-use super::{Direction, Job, Output, Plan, Way, WhenThere, collect, convert, plan, target};
+use super::{
+    Direction, Job, Output, Plan, Way, WhenThere, collect, convert, free_space, make, plan, target,
+    write,
+};
 
 /// A folder of its own for each test, empty.
 fn scratch(name: &str) -> PathBuf {
@@ -241,6 +244,34 @@ fn conversions_go_both_ways_and_leave_no_part_behind() {
     assert!(err.contains("not an STL"), "{err}");
     assert!(!out.join("bad.bread").exists());
     assert!(!out.join("bad.bread.part").exists());
+}
+
+#[test]
+fn a_file_can_be_converted_in_memory_and_written_later() {
+    let root = tree("measure");
+    let job = Job {
+        source: root.join("a.stl"),
+        root: None,
+        way: Way::ToBread,
+        size: 134,
+    };
+    let before: Vec<_> = walk(&root);
+    let made = make(&job).unwrap();
+    assert_eq!(walk(&root), before, "nothing written");
+    let file = read_file(made.as_slice()).unwrap();
+    assert_eq!(file.scene.meshes[0], read_stl(&stl(0.0)).unwrap());
+
+    // Written later, it is what converting writes.
+    write(&made, &root.join("later/a.bread")).unwrap();
+    convert(&job, &root.join("now.bread")).unwrap();
+    assert_eq!(
+        fs::read(root.join("later/a.bread")).unwrap(),
+        fs::read(root.join("now.bread")).unwrap()
+    );
+
+    // Room is asked where a folder is, or would be.
+    assert!(free_space(&root).is_some_and(|n| n > 0));
+    assert_eq!(free_space(&root.join("not/yet/there")), free_space(&root));
 }
 
 fn walk(dir: &Path) -> Vec<PathBuf> {

@@ -218,21 +218,20 @@ fn beside(path: &Path, free: impl Fn(&Path) -> bool) -> PathBuf {
         .expect("a free name")
 }
 
-/// Converts `job` into `out`: its bytes are written to a `.part` file beside
-/// it first and moved into place once whole, so a stop or a crash never
-/// leaves half a file. Gives the size written.
-pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
+/// Converts `job` in memory, checked as `bread from-stl` and `bread to-stl`
+/// check it, and gives what it makes, without writing anything.
+pub fn make(job: &Job) -> Result<Vec<u8>, String> {
     let bytes = fs::read(&job.source).map_err(|e| format!("cannot read it: {e}"))?;
-    let made = match job.way {
+    match job.way {
         Way::ToBread => {
             let name = job
                 .source
                 .file_name()
                 .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
             let prefix = format!("{name}: ");
-            from_stl(&[StlFile { name, bytes }], None)
+            Ok(from_stl(&[StlFile { name, bytes }], None)
                 .map_err(|e| e.0.strip_prefix(&prefix).unwrap_or(&e.0).to_owned())?
-                .0
+                .0)
         }
         Way::ToStl => {
             let file = read_file(bytes.as_slice()).map_err(|e| e.to_string())?;
@@ -240,9 +239,14 @@ pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
             if parts == 0 {
                 return Err("it shows nothing to put in an STL".into());
             }
-            stl
+            Ok(stl)
         }
-    };
+    }
+}
+
+/// Writes `bytes` to `out`: to a `.part` file beside it first, moved into
+/// place once whole, so a stop or a crash never leaves half a file.
+pub fn write(bytes: &[u8], out: &Path) -> Result<(), String> {
     if let Some(dir) = out.parent() {
         fs::create_dir_all(dir).map_err(|e| format!("cannot make {}: {e}", dir.display()))?;
     }
@@ -251,7 +255,7 @@ pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
     let part = PathBuf::from(part);
     let written = (|| {
         let mut f = fs::File::create(&part)?;
-        f.write_all(&made)?;
+        f.write_all(bytes)?;
         f.sync_all()?;
         drop(f);
         fs::rename(&part, out)
@@ -260,7 +264,28 @@ pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
         let _ = fs::remove_file(&part);
         return Err(format!("cannot write {}: {e}", out.display()));
     }
+    Ok(())
+}
+
+/// Converts `job` into `out`, as [`make`] and [`write`] do. Gives the size
+/// written.
+pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
+    let made = make(job)?;
+    write(&made, out)?;
     Ok(made.len() as u64)
+}
+
+/// How much room is free on the drive that holds `path`, or would hold it:
+/// the nearest folder above it that is there is asked.
+pub fn free_space(path: &Path) -> Option<u64> {
+    let mut at = Some(path);
+    while let Some(p) = at {
+        if p.is_dir() {
+            return fs4::available_space(p).ok();
+        }
+        at = p.parent();
+    }
+    None
 }
 
 #[cfg(test)]

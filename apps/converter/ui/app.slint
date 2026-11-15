@@ -11,10 +11,10 @@ import { Theme } from "kit/theme.slint";
 import { Icons } from "kit/icons.slint";
 import {
     Icon, ScButton, ButtonKind, Card, ScCheckBox, Segmented, ScLineEdit, ScProgress, StatTile,
-    Dot, Note, CaptionButton, CaptionKind
+    Dot, Note, WarningNote, CaptionButton, CaptionKind
 } from "kit/controls.slint";
 import { DialogHead, DialogRule } from "kit/dialog.slint";
-import { ListView } from "std-widgets.slint";
+import { ListView, ScrollView } from "std-widgets.slint";
 import "../assets/fonts/NotoSans-Variable.ttf";
 
 // One file of the list.
@@ -30,7 +30,8 @@ export struct JobRow {
     size: string,
     result: string,
     ratio: string,
-    // 0 waiting, 1 converting, 2 done, 3 skipped, 4 failed.
+    // 0 waiting, 1 converting, 2 done, 3 skipped, 4 failed, 5 converted in
+    // memory only, ready to export.
     state: int,
 }
 
@@ -69,7 +70,8 @@ component Row inherits Rectangle {
         VerticalLayout {
             alignment: center;
             Dot {
-                tint: root.job.state == 2 ? Theme.success
+                tint: root.job.state == 5 ? Theme.brand
+                    : root.job.state == 2 ? Theme.success
                     : root.job.state == 4 ? Theme.danger
                     : root.job.state == 3 ? Theme.warning
                     : root.job.state == 1 ? Theme.indicator : Theme.border-strong;
@@ -115,16 +117,18 @@ component Row inherits Rectangle {
         Cell {
             width: 52px;
             text: root.job.ratio;
-            color: root.job.state == 2 ? Theme.brand : Theme.text-soft;
+            color: root.job.state == 2 || root.job.state == 5 ? Theme.brand : Theme.text-soft;
         }
         Text {
             width: 92px;
             text: root.job.state == 0 ? @tr("Waiting")
                 : root.job.state == 1 ? @tr("Converting…")
                 : root.job.state == 2 ? (root.job.way == ".bread → STL" ? @tr("Converted") : @tr("Checked"))
-                : root.job.state == 3 ? @tr("Skipped") : @tr("Failed");
+                : root.job.state == 3 ? @tr("Skipped")
+                : root.job.state == 5 ? @tr("Ready") : @tr("Failed");
             font-size: Theme.font-sm;
             color: root.job.state == 2 ? Theme.success
+                : root.job.state == 5 ? Theme.brand
                 : root.job.state == 4 ? Theme.danger
                 : root.job.state == 3 ? Theme.warning
                 : root.job.state == 1 ? Theme.text : Theme.text-muted;
@@ -137,7 +141,7 @@ export component AppWindow inherits Window {
     title: "Bread Converter";
     icon: @image-url("../assets/icon.png");
     preferred-width: 1080px;
-    preferred-height: 700px;
+    preferred-height: 760px;
     min-width: 860px;
     min-height: 540px;
     background: Theme.ground;
@@ -160,7 +164,8 @@ export component AppWindow inherits Window {
 
     in property <string> version;
     in property <[JobRow]> jobs;
-    // 0 nothing run yet, 1 converting, 2 done, 3 stopped.
+    // 0 nothing run yet, 1 converting, 2 done, 3 stopped, 4 converted in
+    // memory only.
     in property <int> phase;
     // Something to say instead: 1 nothing found to add, 2 no output folder.
     in property <int> notice;
@@ -180,6 +185,16 @@ export component AppWindow inherits Window {
     // The summary of the last run, shown in tiles when it is over.
     in property <string> summary-before;
     in property <string> summary-after;
+    // What the files converted save, or how much more they take.
+    in property <string> saved;
+    in property <bool> grows;
+    // Free room where they would be written, and whether it is too little.
+    in property <string> free-space;
+    in property <bool> short-of-room;
+    // Whether files converted in memory can be written.
+    in property <bool> can-export;
+    // 0 convert and export, 1 convert only.
+    in-out property <int> export-mode;
 
     property <string> files-text: @tr("{n} file" | "{n} files" % root.file-count);
     property <string> outcome-text: @tr("{} converted, {} skipped, {} failed", root.converted, root.skipped, root.failed);
@@ -188,6 +203,8 @@ export component AppWindow inherits Window {
         : root.phase == 1 ? @tr("Converting {} of {}: {} of {}, {}", Math.min(root.done-count + 1, root.run-count), root.run-count, root.bytes-done, root.file-size, root.elapsed)
         : root.phase == 2 ? @tr("Done in {}: {}", root.elapsed, root.outcome-text)
         : root.phase == 3 ? @tr("Stopped after {}: {}", root.elapsed, root.outcome-text)
+        : root.phase == 4 && root.grows ? @tr("Converted in {}, nothing written: {} would take {}, {} more.", root.elapsed, root.summary-before, root.summary-after, root.saved)
+        : root.phase == 4 ? @tr("Converted in {}, nothing written: {} would take {}, {} less.", root.elapsed, root.summary-before, root.summary-after, root.saved)
         : root.file-count == 0 ? @tr("Add STL or .bread files to convert.")
         : @tr("{}, {}", root.files-text, root.file-size);
 
@@ -205,6 +222,7 @@ export component AppWindow inherits Window {
     callback add-folder();
     callback clear();
     callback convert();
+    callback export();
     callback cancel();
     callback choose-output();
     callback open-output();
@@ -325,149 +343,147 @@ export component AppWindow inherits Window {
                     background: Theme.border;
                 }
 
-                VerticalLayout {
-                    padding: 16px;
-                    padding-top: 10px;
-                    spacing: 4px;
+                // Scrolls when the window is too low for it.
+                ScrollView {
+                    width: parent.width - 1px;
+                    height: parent.height;
+                    viewport-width: self.visible-width;
+                    viewport-height: panel.preferred-height;
 
-                    Card {
-                        title: @tr("ADD");
+                    panel := VerticalLayout {
+                        width: parent.width;
+                        padding: 16px;
+                        padding-top: 10px;
+                        spacing: 4px;
 
-                        HorizontalLayout {
-                            spacing: 8px;
-                            ScButton {
-                                icon: Icons.plus;
-                                text: @tr("Files…");
-                                enabled: !root.busy;
-                                horizontal-stretch: 1;
-                                clicked => {
-                                    root.add-files();
+                        Card {
+                            title: @tr("ADD");
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                ScButton {
+                                    icon: Icons.plus;
+                                    text: @tr("Files…");
+                                    enabled: !root.busy;
+                                    horizontal-stretch: 1;
+                                    clicked => {
+                                        root.add-files();
+                                    }
+                                }
+                                ScButton {
+                                    icon: Icons.folder;
+                                    text: @tr("Folder…");
+                                    enabled: !root.busy;
+                                    horizontal-stretch: 1;
+                                    clicked => {
+                                        root.add-folder();
+                                    }
                                 }
                             }
-                            ScButton {
-                                icon: Icons.folder;
-                                text: @tr("Folder…");
-                                enabled: !root.busy;
-                                horizontal-stretch: 1;
-                                clicked => {
-                                    root.add-folder();
-                                }
-                            }
-                        }
-                        ScCheckBox {
-                            text: @tr("Look inside subfolders");
-                            checked <=> root.subfolders;
-                            toggled => {
-                                root.settings-changed();
-                            }
-                        }
-                        Note {
-                            text: @tr("Or drop files and folders on the list.");
-                        }
-                    }
-
-                    Card {
-                        title: @tr("CONVERT");
-
-                        Segmented {
-                            options: [@tr("Both ways"), @tr("STL → .bread"), @tr(".bread → STL")];
-                            current: root.direction;
-                            enabled: !root.busy;
-                            picked(i) => {
-                                root.direction = i;
-                                root.settings-changed();
-                            }
-                        }
-                        Note {
-                            text: root.direction == 0
-                                ? @tr("Each file by its extension: STL to .bread, .bread to STL.")
-                                : root.direction == 1
-                                ? @tr("STL files only, binary or ASCII. Each .bread file is read back and checked bit for bit before it is written.")
-                                : @tr(".bread files only. Everything each file shows goes into one STL, in place.");
-                        }
-                    }
-
-                    Card {
-                        title: @tr("WRITE");
-
-                        Segmented {
-                            options: [@tr("Next to each file"), @tr("Into a folder")];
-                            current: root.output-mode;
-                            enabled: !root.busy;
-                            picked(i) => {
-                                root.output-mode = i;
-                                root.settings-changed();
-                            }
-                        }
-                        if root.output-mode == 1: HorizontalLayout {
-                            spacing: 6px;
-                            ScLineEdit {
-                                text <=> root.output-folder;
-                                placeholder-text: @tr("Choose a folder");
-                                enabled: !root.busy;
-                                horizontal-stretch: 1;
-                                edited => {
+                            ScCheckBox {
+                                text: @tr("Look inside subfolders");
+                                checked <=> root.subfolders;
+                                toggled => {
                                     root.settings-changed();
                                 }
                             }
-                            ScButton {
-                                icon: Icons.folder;
+                            Note {
+                                text: @tr("Or drop files and folders on the list.");
+                            }
+                        }
+
+                        Card {
+                            title: @tr("CONVERT");
+
+                            Segmented {
+                                options: [@tr("Both ways"), @tr("STL → .bread"), @tr(".bread → STL")];
+                                current: root.direction;
                                 enabled: !root.busy;
-                                horizontal-stretch: 0;
-                                clicked => {
-                                    root.choose-output();
+                                picked(i) => {
+                                    root.direction = i;
+                                    root.settings-changed();
+                                }
+                            }
+                            Note {
+                                text: root.direction == 0
+                                    ? @tr("Each file by its extension: STL to .bread, .bread to STL.")
+                                    : root.direction == 1
+                                    ? @tr("STL files only, binary or ASCII. Each .bread file is read back and checked bit for bit before it is written.")
+                                    : @tr(".bread files only. Everything each file shows goes into one STL, in place.");
+                            }
+                        }
+
+                        Card {
+                            title: @tr("EXPORT");
+
+                            Segmented {
+                                options: [@tr("Convert and export"), @tr("Convert only")];
+                                current: root.export-mode;
+                                enabled: !root.busy;
+                                picked(i) => {
+                                    root.export-mode = i;
+                                    root.settings-changed();
+                                }
+                            }
+                            Note {
+                                text: root.export-mode == 0
+                                    ? @tr("Each file is written as soon as it is converted.")
+                                    : @tr("Nothing is written yet: see how much room they would take, then export them as set below.");
+                            }
+                        }
+
+                        Card {
+                            title: @tr("WRITE");
+
+                            Segmented {
+                                options: [@tr("Next to each file"), @tr("Into a folder")];
+                                current: root.output-mode;
+                                enabled: !root.busy;
+                                picked(i) => {
+                                    root.output-mode = i;
+                                    root.settings-changed();
+                                }
+                            }
+                            if root.output-mode == 1: HorizontalLayout {
+                                spacing: 6px;
+                                ScLineEdit {
+                                    text <=> root.output-folder;
+                                    placeholder-text: @tr("Choose a folder");
+                                    enabled: !root.busy;
+                                    horizontal-stretch: 1;
+                                    edited => {
+                                        root.settings-changed();
+                                    }
+                                }
+                                ScButton {
+                                    icon: Icons.folder;
+                                    enabled: !root.busy;
+                                    horizontal-stretch: 0;
+                                    clicked => {
+                                        root.choose-output();
+                                    }
+                                }
+                            }
+                            if root.output-mode == 1: ScCheckBox {
+                                text: @tr("Keep the subfolders");
+                                checked <=> root.keep-tree;
+                                toggled => {
+                                    root.settings-changed();
                                 }
                             }
                         }
-                        if root.output-mode == 1: ScCheckBox {
-                            text: @tr("Keep the subfolders");
-                            checked <=> root.keep-tree;
-                            toggled => {
-                                root.settings-changed();
-                            }
-                        }
-                    }
 
-                    Card {
-                        title: @tr("IF THE FILE IS THERE");
+                        Card {
+                            title: @tr("IF THE FILE IS THERE");
 
-                        Segmented {
-                            options: [@tr("Skip"), @tr("Replace"), @tr("Keep both")];
-                            current: root.when-there;
-                            enabled: !root.busy;
-                            picked(i) => {
-                                root.when-there = i;
-                                root.settings-changed();
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        vertical-stretch: 1;
-                    }
-
-                    if root.phase >= 2: VerticalLayout {
-                        spacing: 6px;
-                        HorizontalLayout {
-                            spacing: 6px;
-                            StatTile {
-                                value: root.converted;
-                                caption: @tr("converted");
-                            }
-                            StatTile {
-                                value: root.elapsed;
-                                caption: @tr("time");
-                            }
-                        }
-                        HorizontalLayout {
-                            spacing: 6px;
-                            StatTile {
-                                value: root.summary-before;
-                                caption: @tr("before");
-                            }
-                            StatTile {
-                                value: root.summary-after;
-                                caption: @tr("after");
+                            Segmented {
+                                options: [@tr("Skip"), @tr("Replace"), @tr("Keep both")];
+                                current: root.when-there;
+                                enabled: !root.busy;
+                                picked(i) => {
+                                    root.when-there = i;
+                                    root.settings-changed();
+                                }
                             }
                         }
                     }
@@ -562,6 +578,52 @@ export component AppWindow inherits Window {
                         for job[i] in root.jobs: Row {
                             job: job;
                             odd: Math.mod(i, 2) == 1;
+                        }
+                    }
+
+                    if root.phase >= 2: Rectangle {
+                        background: Theme.panel;
+
+                        Rectangle {
+                            y: 0;
+                            height: 1px;
+                            background: Theme.border;
+                        }
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                StatTile {
+                                    value: root.converted;
+                                    caption: @tr("converted");
+                                }
+                                StatTile {
+                                    value: root.elapsed;
+                                    caption: @tr("time");
+                                }
+                                StatTile {
+                                    value: root.summary-before;
+                                    caption: @tr("before");
+                                }
+                                StatTile {
+                                    value: root.summary-after;
+                                    caption: root.phase == 4 ? @tr("would take") : @tr("after");
+                                }
+                                StatTile {
+                                    value: root.saved;
+                                    caption: root.grows ? @tr("more") : @tr("saved");
+                                }
+                                if root.phase == 4 || root.can-export: StatTile {
+                                    value: root.free-space;
+                                    caption: @tr("free where it would go");
+                                }
+                            }
+                            if root.short-of-room: WarningNote {
+                                text: @tr("There is not enough room there for them: export them somewhere else, or skip some.");
+                            }
                         }
                     }
                 }
@@ -662,11 +724,24 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
+                if !root.busy && root.can-export: VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    ScButton {
+                        icon: Icons.save;
+                        text: @tr("Export");
+                        button-height: 32px;
+                        kind: ButtonKind.primary;
+                        clicked => {
+                            root.export();
+                        }
+                    }
+                }
                 if !root.busy: VerticalLayout {
                     alignment: center;
                     horizontal-stretch: 0;
                     ScButton {
-                        kind: ButtonKind.primary;
+                        kind: root.can-export ? ButtonKind.normal : ButtonKind.primary;
                         icon: Icons.export;
                         text: @tr("Convert");
                         button-height: 32px;

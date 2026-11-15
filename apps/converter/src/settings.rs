@@ -18,6 +18,8 @@ pub struct Settings {
     pub output_folder: String,
     pub keep_tree: bool,
     pub when_there: i32,
+    /// 0 convert and export, 1 convert only.
+    pub export_mode: i32,
     /// Where the last file dialog was.
     pub last_folder: String,
     /// "en" or "es", or empty for the system's.
@@ -33,6 +35,7 @@ impl Default for Settings {
             output_folder: String::new(),
             keep_tree: true,
             when_there: 0,
+            export_mode: 0,
             last_folder: String::new(),
             language: String::new(),
         }
@@ -67,6 +70,7 @@ impl Settings {
                 "output_folder" => s.output_folder = value.to_owned(),
                 "keep_tree" => s.keep_tree = flag().unwrap_or(s.keep_tree),
                 "when_there" => s.when_there = choice(2).unwrap_or(s.when_there),
+                "export_mode" => s.export_mode = choice(1).unwrap_or(s.export_mode),
                 "last_folder" => s.last_folder = value.to_owned(),
                 "language" if matches!(value.trim(), "en" | "es") => {
                     s.language = value.trim().to_owned();
@@ -80,13 +84,14 @@ impl Settings {
     pub fn text(&self) -> String {
         let one_line = |v: &str| v.replace(['\r', '\n'], "");
         format!(
-            "direction={}\nsubfolders={}\noutput_mode={}\noutput_folder={}\nkeep_tree={}\nwhen_there={}\nlast_folder={}\nlanguage={}\n",
+            "direction={}\nsubfolders={}\noutput_mode={}\noutput_folder={}\nkeep_tree={}\nwhen_there={}\nexport_mode={}\nlast_folder={}\nlanguage={}\n",
             self.direction,
             self.subfolders,
             self.output_mode,
             one_line(&self.output_folder),
             self.keep_tree,
             self.when_there,
+            self.export_mode,
             one_line(&self.last_folder),
             self.language,
         )
@@ -141,6 +146,7 @@ mod tests {
             output_folder: "D:/out folder".into(),
             keep_tree: false,
             when_there: 2,
+            export_mode: 1,
             last_folder: "C:/models".into(),
             language: "es".into(),
         };
