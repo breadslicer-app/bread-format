@@ -694,6 +694,7 @@ export component AppWindow inherits Window {
                     ScButton {
                         icon: Icons.folder;
                         text: @tr("Open folder");
+                        button-height: 32px;
                         enabled: root.can-open-output;
                         clicked => {
                             root.open-output();
@@ -706,6 +707,7 @@ export component AppWindow inherits Window {
                     ScButton {
                         icon: Icons.trash;
                         text: @tr("Clear");
+                        button-height: 32px;
                         enabled: !root.busy && root.jobs.length > 0;
                         clicked => {
                             root.clear();
