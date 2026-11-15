@@ -89,5 +89,6 @@ Slint
 -----
 
 The window is drawn with Slint (https://slint.dev), used under the Slint
-Royalty-free Desktop, Mobile, and Web Applications License 2.0, whose
-attribution the About box shows.
+Royalty-free Desktop, Mobile, and Web Applications License 2.0. Its
+attribution is the "Made with Slint" badge on the program's page,
+apps/converter/README.md.

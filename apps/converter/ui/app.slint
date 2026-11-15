@@ -11,10 +11,10 @@ import { Theme } from "kit/theme.slint";
 import { Icons } from "kit/icons.slint";
 import {
     Icon, ScButton, ButtonKind, Card, ScCheckBox, Segmented, ScLineEdit, ScProgress, StatTile,
-    Dot, Note
+    Dot, Note, CaptionButton, CaptionKind
 } from "kit/controls.slint";
 import { DialogHead, DialogRule } from "kit/dialog.slint";
-import { ListView, AboutSlint } from "std-widgets.slint";
+import { ListView } from "std-widgets.slint";
 import "../assets/fonts/NotoSans-Variable.ttf";
 
 // One file of the list.
@@ -144,6 +144,20 @@ export component AppWindow inherits Window {
     default-font-family: "Noto Sans";
     default-font-size: Theme.font;
 
+    // The window's own title bar, as Breadslicer's: the top bar takes the
+    // caption buttons and is where the window is dragged from, and the edges
+    // are where it is resized. Rust turns it on where it is supported
+    // (Windows).
+    in property <bool> custom-chrome: false;
+    in property <bool> window-maximized: false;
+    callback window-drag();
+    callback window-minimize();
+    callback window-maximize-toggle();
+    callback window-close();
+    // 0 N, 1 S, 2 E, 3 W, 4 NE, 5 NW, 6 SE, 7 SW.
+    callback window-resize(int);
+    no-frame: root.custom-chrome;
+
     in property <string> version;
     in property <[JobRow]> jobs;
     // 0 nothing run yet, 1 converting, 2 done, 3 stopped.
@@ -210,9 +224,22 @@ export component AppWindow inherits Window {
                 background: Theme.border;
             }
 
+            // With the window's own title bar, what of the bar holds no
+            // control drags the window; a double click maximises it.
+            if root.custom-chrome: TouchArea {
+                pointer-event(event) => {
+                    if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                        root.window-drag();
+                    }
+                }
+                double-clicked => {
+                    root.window-maximize-toggle();
+                }
+            }
+
             HorizontalLayout {
                 padding-left: 14px;
-                padding-right: 10px;
+                padding-right: root.custom-chrome ? 0px : 10px;
                 spacing: 10px;
 
                 VerticalLayout {
@@ -258,6 +285,27 @@ export component AppWindow inherits Window {
                         clicked => {
                             root.about-open = true;
                         }
+                    }
+                }
+                if root.custom-chrome: CaptionButton {
+                    kind: CaptionKind.minimize;
+                    label: @tr("Minimize");
+                    clicked => {
+                        root.window-minimize();
+                    }
+                }
+                if root.custom-chrome: CaptionButton {
+                    kind: root.window-maximized ? CaptionKind.restore : CaptionKind.maximize;
+                    label: root.window-maximized ? @tr("Restore") : @tr("Maximize");
+                    clicked => {
+                        root.window-maximize-toggle();
+                    }
+                }
+                if root.custom-chrome: CaptionButton {
+                    kind: CaptionKind.close;
+                    label: @tr("Close");
+                    clicked => {
+                        root.window-close();
                     }
                 }
             }
@@ -632,6 +680,35 @@ export component AppWindow inherits Window {
         }
     }
 
+    // The window's edges and corners, while it is not maximised: where the
+    // window's own frame is resized from.
+    if root.custom-chrome && !root.window-maximized: frame := Rectangle {
+        property <length> edge: 5px;
+        property <length> corner: 10px;
+
+        for side[i] in [
+            { x: frame.corner, y: 0px, w: root.width - 2 * frame.corner, h: frame.edge, d: 0, c: MouseCursor.ns-resize },
+            { x: frame.corner, y: root.height - frame.edge, w: root.width - 2 * frame.corner, h: frame.edge, d: 1, c: MouseCursor.ns-resize },
+            { x: root.width - frame.edge, y: frame.corner, w: frame.edge, h: root.height - 2 * frame.corner, d: 2, c: MouseCursor.ew-resize },
+            { x: 0px, y: frame.corner, w: frame.edge, h: root.height - 2 * frame.corner, d: 3, c: MouseCursor.ew-resize },
+            { x: root.width - frame.corner, y: 0px, w: frame.corner, h: frame.corner, d: 4, c: MouseCursor.nesw-resize },
+            { x: 0px, y: 0px, w: frame.corner, h: frame.corner, d: 5, c: MouseCursor.nwse-resize },
+            { x: root.width - frame.corner, y: root.height - frame.corner, w: frame.corner, h: frame.corner, d: 6, c: MouseCursor.nwse-resize },
+            { x: 0px, y: root.height - frame.corner, w: frame.corner, h: frame.corner, d: 7, c: MouseCursor.nesw-resize },
+        ]: TouchArea {
+            x: side.x;
+            y: side.y;
+            width: side.w;
+            height: side.h;
+            mouse-cursor: side.c;
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    root.window-resize(side.d);
+                }
+            }
+        }
+    }
+
     // About, over the window.
     if root.about-open: Rectangle {
         background: #000000a0;
@@ -671,7 +748,7 @@ export component AppWindow inherits Window {
                 }
                 DialogRule { }
                 Note {
-                    text: @tr("Part of bread-format, the open .bread format: tiny, lossless meshes and scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and the Noto Sans font (SIL OFL 1.1).");
+                    text: @tr("Part of bread-format, the open .bread format: tiny, lossless meshes and scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and the Noto Sans font (SIL OFL 1.1). Its window is drawn with Slint.");
                 }
                 HorizontalLayout {
                     spacing: 8px;
@@ -690,9 +767,6 @@ export component AppWindow inherits Window {
                     Rectangle {
                         horizontal-stretch: 1;
                     }
-                }
-                AboutSlint {
-                    height: 80px;
                 }
             }
         }

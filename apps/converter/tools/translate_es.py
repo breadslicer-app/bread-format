@@ -70,8 +70,11 @@ ES = {
     "Stop": "Detener",
     "Convert": "Convertir",
     "Close": "Cerrar",
-    "Part of bread-format, the open .bread format: tiny, lossless meshes and scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and the Noto Sans font (SIL OFL 1.1).":
-        "Parte de bread-format, el formato abierto .bread: mallas y escenas chiquitas y sin pérdida. Apache-2.0. Incluye meshoptimizer (MIT) y Zstandard (BSD), y la fuente Noto Sans (SIL OFL 1.1).",
+    "Minimize": "Minimizar",
+    "Maximize": "Maximizar",
+    "Restore": "Restaurar",
+    "Part of bread-format, the open .bread format: tiny, lossless meshes and scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and the Noto Sans font (SIL OFL 1.1). Its window is drawn with Slint.":
+        "Parte de bread-format, el formato abierto .bread: mallas y escenas chiquitas y sin pérdida. Apache-2.0. Incluye meshoptimizer (MIT) y Zstandard (BSD), y la fuente Noto Sans (SIL OFL 1.1). Su ventana está hecha con Slint.",
 }
 
 

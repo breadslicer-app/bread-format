@@ -19,6 +19,8 @@ checked exactly as `bread from-stl` and `bread to-stl` do it.
   and why a file failed. Files are written to a `.part` file first and moved into place once
   whole, so stopping never leaves half a file.
 - **Stop** stops after the files being converted. **Open folder** opens where the files went.
+- On Windows the window draws its own title bar, as Breadslicer does: the top bar is where it is
+  dragged from, a double click maximises it, and its edges resize it.
 - The window remembers its choices (`%APPDATA%\Bread Converter\settings.txt` on Windows), and
   speaks English and Spanish.
 
@@ -50,4 +52,6 @@ python tools/translate_es.py
 
 Apache-2.0. The program carries meshoptimizer, Zstandard and the Noto Sans font, and draws its
 window with [Slint](https://slint.dev) under Slint's royalty-free license for desktop
-applications, whose attribution the About box shows: see [`NOTICE`](NOTICE).
+applications, whose attribution is the badge below: see [`NOTICE`](NOTICE).
+
+[![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev)

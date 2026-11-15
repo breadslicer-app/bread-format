@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 
 use bread_converter::queue::{self, Direction, Job, Output, Plan, Way, WhenThere};
 use bread_converter::settings::Settings;
+use slint::winit_030::winit::window::ResizeDirection;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
@@ -175,13 +176,19 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     });
 
-    // Files dropped on the window.
+    wire_chrome(&ui);
+
+    // Files dropped on the window, and the maximise button kept in step.
     let weak = ui.as_weak();
     ui.window().on_winit_window_event(move |_window, event| {
         let Some(ui) = weak.upgrade() else {
             return EventResult::Propagate;
         };
         match event {
+            winit::event::WindowEvent::Resized(_) => {
+                ui.set_window_maximized(ui.window().is_maximized());
+                return EventResult::Propagate;
+            }
             winit::event::WindowEvent::HoveredFile(_) => ui.set_dropping(!ui.get_busy()),
             winit::event::WindowEvent::HoveredFileCancelled => ui.set_dropping(false),
             winit::event::WindowEvent::DroppedFile(path) => {
@@ -202,7 +209,77 @@ fn main() -> Result<(), slint::PlatformError> {
         app(|a| a.add(&given));
     }
 
-    ui.run()
+    ui.show()?;
+    // The shadow a framed window has.
+    #[cfg(windows)]
+    if CUSTOM_CHROME {
+        ui.window().with_winit_window(|w| {
+            use slint::winit_030::winit::platform::windows::WindowExtWindows;
+            w.set_undecorated_shadow(true);
+        });
+    }
+    slint::run_event_loop()?;
+    ui.hide()
+}
+
+/// Whether the window draws its own title bar, as Breadslicer does where it
+/// can: on Windows. Elsewhere the system's frame stays.
+const CUSTOM_CHROME: bool = cfg!(windows);
+
+/// Turns the window's own title bar on and wires its buttons, its drag and
+/// its edges. Before the window is shown.
+fn wire_chrome(ui: &AppWindow) {
+    if !CUSTOM_CHROME {
+        return;
+    }
+    ui.set_custom_chrome(true);
+    let weak = ui.as_weak();
+    ui.on_window_drag(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.window().with_winit_window(|w| {
+                let _ = w.drag_window();
+            });
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_window_minimize(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.window().set_minimized(true);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_window_maximize_toggle(move || {
+        if let Some(ui) = weak.upgrade() {
+            let maximized = !ui.window().is_maximized();
+            ui.window().set_maximized(maximized);
+            ui.set_window_maximized(maximized);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_window_close(move || {
+        if let Some(ui) = weak.upgrade() {
+            let _ = ui.hide();
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_window_resize(move |side| {
+        let direction = match side {
+            0 => ResizeDirection::North,
+            1 => ResizeDirection::South,
+            2 => ResizeDirection::East,
+            3 => ResizeDirection::West,
+            4 => ResizeDirection::NorthEast,
+            5 => ResizeDirection::NorthWest,
+            6 => ResizeDirection::SouthEast,
+            7 => ResizeDirection::SouthWest,
+            _ => return,
+        };
+        if let Some(ui) = weak.upgrade() {
+            ui.window().with_winit_window(|w| {
+                let _ = w.drag_resize_window(direction);
+            });
+        }
+    });
 }
 
 /// A native file dialog over the window, starting where the last one was.
