@@ -1,0 +1,52 @@
+[package]
+name = "bread-converter"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors = ["SynrgStudio"]
+description = "Bread Converter: STL and .bread, both ways, many files at once, in a window."
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "bread-converter"
+path = "src/main.rs"
+
+# The workspace lints, except that unsafe code is denied instead of forbidden:
+# the code Slint generates for the window allows it in its own module, which
+# a forbid would refuse. None of this crate's own code uses it.
+[lints.rust]
+unsafe_code                   = "deny"
+non_ascii_idents              = "deny"
+confusable_idents             = "deny"
+mixed_script_confusables      = "deny"
+uncommon_codepoints           = "deny"
+missing_debug_implementations = "deny"
+unreachable_pub               = "deny"
+unused_qualifications         = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+
+[dependencies]
+bread-cli = { path = "../../crates/bread-cli" }
+bread-format = { path = "../../crates/bread-format" }
+rfd = "0.17.2"
+sys-locale = "0.3.2"
+# The same Slint as Breadslicer, drawn with FemtoVG (OpenGL) or, without it,
+# in software; winit for files dropped on the window.
+slint = { version = "1.18.1", default-features = false, features = [
+    "accessibility",
+    "backend-winit",
+    "compat-1-2",
+    "renderer-femtovg",
+    "renderer-software",
+    "std",
+    "unstable-winit-030",
+] }
+
+[build-dependencies]
+slint-build = "1.18.1"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1.31"

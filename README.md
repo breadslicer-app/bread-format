@@ -74,6 +74,7 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`SPEC.md`](SPEC.md) | The specification, version 1, frozen (tag `spec-v1`). |
 | [`conformance/`](conformance) | Valid and invalid files, each with what a reader must make of it. |
 | [`crates/bread-format`](crates/bread-format) | The reference implementation, in Rust: reads and writes `.bread`, and reads STL. |
+| [`apps/converter`](apps/converter) | Bread Converter, a desktop program: STL to `.bread` and back, many files at once, in Breadslicer's look. |
 | [`crates/bread-cli`](crates/bread-cli) | `bread`, a command-line program: STL to `.bread` and back, and what a file holds. |
 | [`crates/bread-wasm`](crates/bread-wasm) | The same crate built to WebAssembly. |
 | [`bindings/js`](bindings/js) | The JavaScript package, for the browser and Node, on that WebAssembly module. |
@@ -106,6 +107,7 @@ The JavaScript package and the Python reader say how to build and use them in th
   version 0.9.6.
 - **The viewer** at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/).
 - **[`bread`](crates/bread-cli)**, the command-line program in this repository.
+- **[Bread Converter](apps/converter)**, the desktop converter in this repository.
 
 To write a reader of your own, start from [`SPEC.md`](SPEC.md) and check it against
 [`conformance/`](conformance).

@@ -1,0 +1,316 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2026-11-15 06:49+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: ui/app.slint:89
+msgctxt "Row"
+msgid "Already there: {}"
+msgstr ""
+
+#: ui/app.slint:90
+msgctxt "Row"
+msgid "Not converted this way"
+msgstr ""
+
+#: ui/app.slint:91
+msgctxt "Row"
+msgid "→ {}"
+msgstr ""
+
+#: ui/app.slint:122
+msgctxt "Row"
+msgid "Waiting"
+msgstr ""
+
+#: ui/app.slint:123
+msgctxt "Row"
+msgid "Converting…"
+msgstr ""
+
+#: ui/app.slint:124
+msgctxt "Row"
+msgid "Converted"
+msgstr ""
+
+#: ui/app.slint:124
+msgctxt "Row"
+msgid "Checked"
+msgstr ""
+
+#: ui/app.slint:125
+msgctxt "Row"
+msgid "Skipped"
+msgstr ""
+
+#: ui/app.slint:125
+msgctxt "Row"
+msgid "Failed"
+msgstr ""
+
+#: ui/app.slint:170
+msgctxt "AppWindow"
+msgid "{n} file"
+msgid_plural "{n} files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: ui/app.slint:171
+msgctxt "AppWindow"
+msgid "{} converted, {} skipped, {} failed"
+msgstr ""
+
+#: ui/app.slint:172
+msgctxt "AppWindow"
+msgid "Nothing to add there: no STL or .bread files."
+msgstr ""
+
+#: ui/app.slint:173
+msgctxt "AppWindow"
+msgid "Choose the folder to write into."
+msgstr ""
+
+#: ui/app.slint:174
+msgctxt "AppWindow"
+msgid "Converting {} of {}: {} of {}, {}"
+msgstr ""
+
+#: ui/app.slint:175
+msgctxt "AppWindow"
+msgid "Done in {}: {}"
+msgstr ""
+
+#: ui/app.slint:176
+msgctxt "AppWindow"
+msgid "Stopped after {}: {}"
+msgstr ""
+
+#: ui/app.slint:177
+msgctxt "AppWindow"
+msgid "Add STL or .bread files to convert."
+msgstr ""
+
+#: ui/app.slint:178
+msgctxt "AppWindow"
+msgid "{}, {}"
+msgstr ""
+
+#: ui/app.slint:234 ui/app.slint:665
+msgctxt "AppWindow"
+msgid "STL and .bread, both ways, without losing a bit"
+msgstr ""
+
+#: ui/app.slint:257
+msgctxt "AppWindow"
+msgid "About"
+msgstr ""
+
+#: ui/app.slint:286
+msgctxt "AppWindow"
+msgid "ADD"
+msgstr ""
+
+#: ui/app.slint:292
+msgctxt "AppWindow"
+msgid "Files…"
+msgstr ""
+
+#: ui/app.slint:301
+msgctxt "AppWindow"
+msgid "Folder…"
+msgstr ""
+
+#: ui/app.slint:310
+msgctxt "AppWindow"
+msgid "Look inside subfolders"
+msgstr ""
+
+#: ui/app.slint:317
+msgctxt "AppWindow"
+msgid "Or drop files and folders on the list."
+msgstr ""
+
+#: ui/app.slint:322
+msgctxt "AppWindow"
+msgid "CONVERT"
+msgstr ""
+
+#: ui/app.slint:325
+msgctxt "AppWindow"
+msgid "Both ways"
+msgstr ""
+
+#: ui/app.slint:325
+msgctxt "AppWindow"
+msgid "STL → .bread"
+msgstr ""
+
+#: ui/app.slint:325
+msgctxt "AppWindow"
+msgid ".bread → STL"
+msgstr ""
+
+#: ui/app.slint:335
+msgctxt "AppWindow"
+msgid "Each file by its extension: STL to .bread, .bread to STL."
+msgstr ""
+
+#: ui/app.slint:337
+msgctxt "AppWindow"
+msgid ""
+"STL files only, binary or ASCII. Each .bread file is read back and checked "
+"bit for bit before it is written."
+msgstr ""
+
+#: ui/app.slint:338
+msgctxt "AppWindow"
+msgid ""
+".bread files only. Everything each file shows goes into one STL, in place."
+msgstr ""
+
+#: ui/app.slint:343
+msgctxt "AppWindow"
+msgid "WRITE"
+msgstr ""
+
+#: ui/app.slint:346
+msgctxt "AppWindow"
+msgid "Next to each file"
+msgstr ""
+
+#: ui/app.slint:346
+msgctxt "AppWindow"
+msgid "Into a folder"
+msgstr ""
+
+#: ui/app.slint:358
+msgctxt "AppWindow"
+msgid "Choose a folder"
+msgstr ""
+
+#: ui/app.slint:374
+msgctxt "AppWindow"
+msgid "Keep the subfolders"
+msgstr ""
+
+#: ui/app.slint:383
+msgctxt "AppWindow"
+msgid "IF THE FILE IS THERE"
+msgstr ""
+
+#: ui/app.slint:386
+msgctxt "AppWindow"
+msgid "Skip"
+msgstr ""
+
+#: ui/app.slint:386
+msgctxt "AppWindow"
+msgid "Replace"
+msgstr ""
+
+#: ui/app.slint:386
+msgctxt "AppWindow"
+msgid "Keep both"
+msgstr ""
+
+#: ui/app.slint:406
+msgctxt "AppWindow"
+msgid "converted"
+msgstr ""
+
+#: ui/app.slint:410
+msgctxt "AppWindow"
+msgid "time"
+msgstr ""
+
+#: ui/app.slint:417
+msgctxt "AppWindow"
+msgid "before"
+msgstr ""
+
+#: ui/app.slint:421
+msgctxt "AppWindow"
+msgid "after"
+msgstr ""
+
+#: ui/app.slint:453
+msgctxt "AppWindow"
+msgid "FILE"
+msgstr ""
+
+#: ui/app.slint:458
+msgctxt "AppWindow"
+msgid "WAY"
+msgstr ""
+
+#: ui/app.slint:462
+msgctxt "AppWindow"
+msgid "SIZE"
+msgstr ""
+
+#: ui/app.slint:467
+msgctxt "AppWindow"
+msgid "RESULT"
+msgstr ""
+
+#: ui/app.slint:477
+msgctxt "AppWindow"
+msgid "STATE"
+msgstr ""
+
+#: ui/app.slint:498
+msgctxt "AppWindow"
+msgid "Drop STL and .bread files or folders here"
+msgstr ""
+
+#: ui/app.slint:504
+msgctxt "AppWindow"
+msgid "or add them with Files… and Folder…"
+msgstr ""
+
+#: ui/app.slint:539
+msgctxt "AppWindow"
+msgid "Drop to add"
+msgstr ""
+
+#: ui/app.slint:585
+msgctxt "AppWindow"
+msgid "Open folder"
+msgstr ""
+
+#: ui/app.slint:597
+msgctxt "AppWindow"
+msgid "Clear"
+msgstr ""
+
+#: ui/app.slint:609
+msgctxt "AppWindow"
+msgid "Stop"
+msgstr ""
+
+#: ui/app.slint:622
+msgctxt "AppWindow"
+msgid "Convert"
+msgstr ""
+
+#: ui/app.slint:666
+msgctxt "AppWindow"
+msgid "Close"
+msgstr ""
+
+#: ui/app.slint:673
+msgctxt "AppWindow"
+msgid ""
+"Part of bread-format, the open .bread format: tiny, lossless meshes and "
+"scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and "
+"the Noto Sans font (SIL OFL 1.1)."
+msgstr ""
