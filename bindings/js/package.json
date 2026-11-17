@@ -2,17 +2,27 @@
   "name": "bread-format",
   "version": "0.1.0",
   "description": "Reads and writes .bread files in JavaScript, through the bread-format crate built to WebAssembly.",
-  "private": true,
   "license": "Apache-2.0",
+  "author": "SynrgStudio",
+  "homepage": "https://bread.synrgs.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/breadslicer-app/bread-format.git",
+    "directory": "bindings/js"
+  },
+  "bugs": "https://github.com/breadslicer-app/bread-format/issues",
+  "keywords": ["bread", "3d", "mesh", "stl", "lossless", "3d-printing", "webassembly"],
+  "files": ["src/", "dist/bread.wasm", "dist/bread-write.wasm", "dist/NOTICE", "LICENSE"],
   "type": "module",
   "exports": {
     ".": "./src/index.js",
     "./bread.wasm": "./dist/bread.wasm",
-		"./bread-write.wasm": "./dist/bread-write.wasm"
+    "./bread-write.wasm": "./dist/bread-write.wasm"
   },
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "node build.mjs && node --test"
   },
   "engines": {
     "node": ">=20"
