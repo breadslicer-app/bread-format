@@ -1,9 +1,12 @@
 # bread-format for JavaScript
 
 Reads `.bread` files in the browser and in Node, through the `bread-format` crate built to
-WebAssembly ([`crates/bread-wasm`](../../crates/bread-wasm)): one implementation, with the same
-checks as every other reader. It has no dependencies. It is not published yet; the package name
-is still to be settled.
+WebAssembly ([`crates/bread-wasm`](https://github.com/breadslicer-app/bread-format/tree/main/crates/bread-wasm)): one implementation, with the same
+checks as every other reader. It has no dependencies.
+
+```
+npm install bread-format
+```
 
 It reads the container, the chunks of a file, each checked and decompressed; the meshes in them,
 `MESH` versions 1 and 2; and the scene that places them. It also reads STL files and writes `.bread`
@@ -13,6 +16,10 @@ The module comes built twice. `dist/bread.wasm` reads, and is about 77 KB with b
 `dist/bread-write.wasm` also reads STL and writes `.bread`, and is about 171 KB, because it takes
 zstd's compressor and meshoptimizer's encoders. A page that only shows files loads the first; one
 that converts loads the second when it is needed. Both read the same way.
+
+`load` takes the module's bytes, a `Response` or a compiled `WebAssembly.Module`. In Node,
+`readFile(new URL(import.meta.resolve('bread-format/bread.wasm')))` gives the bytes. In a page,
+serve the module next to your files, or let your bundler give its URL, and `fetch` it.
 
 ```js
 import { load, placeMeshes, BreadError } from 'bread-format';
@@ -35,7 +42,7 @@ try {
 
 `readChunks` returns the chunks this version of the format knows, in file order, and skips the
 others, official or private. It throws a `BreadError` for a file it refuses: `reason` is one of the
-reason codes of [`conformance/README.md`](../../conformance/README.md), and `chunk` the tag of the
+reason codes of [`conformance/README.md`](https://github.com/breadslicer-app/bread-format/blob/main/conformance/README.md), and `chunk` the tag of the
 chunk it is about, or `null`.
 
 `decodeMesh` takes a `MESH` chunk as `readChunks` gives it and returns its metadata (`null`, or a
@@ -45,7 +52,7 @@ Coordinates come back bit for bit. It throws a `BreadError` with reason `malform
 `no-such-vertex` or `version` for a mesh it refuses.
 
 `decodeScene` takes the chunks `readChunks` gives and returns the scene ([`SPEC.md`, section
-5](../../SPEC.md#5-scene-scne)) as it is stored: its metadata, `meshCount`, `meshResources`,
+5](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md#5-scene-scne)) as it is stored: its metadata, `meshCount`, `meshResources`,
 `nodes`, `subtrees` and `roots`, which name meshes by their order among the `MESH` chunks. Each node
 has a `kind` (`'group'`, `'leaf'`, `'shared leaf'` or `'reference'`), its `meta`, its `transform`
 (`null` for the identity, or `linear`, three rows, and `translation`), and by kind its `children`,
@@ -59,7 +66,7 @@ each reference that reaches it. References can copy subtrees that copy subtrees,
 ask for a great many leaves: past a million nodes walked, or `{ limit }`, it throws a `RangeError`.
 
 `decodePreviews(chunks, meshes)` returns the support previews ([`SPEC.md`, section
-9](../../SPEC.md#9-support-preview-sprv)): for each support leaf that has one, the leaf's node index
+9](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md#9-support-preview-sprv)): for each support leaf that has one, the leaf's node index
 and the mesh of its supports, in the leaf's own space, to draw wherever `placeMeshes` places that
 leaf. `meshes` are the file's meshes, as `decodeMesh` gives them, which section 9.2's checks need. It
 returns an empty list for a file without previews, and throws a `BreadError` for previews it refuses.
@@ -88,9 +95,9 @@ by a leaf named after its file, where the STL put it.
 
 ## Building and testing
 
-`npm run build` builds the module into `dist/bread.wasm` (see [build.mjs](build.mjs) for what it
+`npm run build` builds the module into `dist/bread.wasm` (see [build.mjs](https://github.com/breadslicer-app/bread-format/blob/main/bindings/js/build.mjs) for what it
 needs: the `wasm32-unknown-unknown` Rust target, and a clang that targets WebAssembly through
 `WASI_SDK_PATH`). `npm test` checks it against the conformance files.
 
-`dist/` also gets the module's [NOTICE](../../crates/bread-wasm/NOTICE), for meshoptimizer and
+`dist/` also gets the module's [NOTICE](https://github.com/breadslicer-app/bread-format/blob/main/crates/bread-wasm/NOTICE), for meshoptimizer and
 zstd: keep it with the module wherever it goes.
