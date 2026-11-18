@@ -5,7 +5,7 @@ What changes in each release of the `bread-format` crate. The format itself is d
 later release. Before the freeze, a release could read files of an older release differently,
 and each release said how.
 
-## 0.4.0 (unreleased)
+## 0.4.0 (2026-11-18)
 
 The first release on crates.io. Files open and are written exactly as in 0.3.0, except for the
 refusal below.
