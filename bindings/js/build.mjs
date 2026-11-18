@@ -10,6 +10,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,6 +36,26 @@ if (!env.CC_wasm32_unknown_unknown) {
 const include = `-include ${join(crate, 'wasm/meshopt-math.h').replaceAll('\\', '/')}`;
 env.CFLAGS_wasm32_unknown_unknown = include;
 env.CXXFLAGS_wasm32_unknown_unknown = include;
+
+// Paths on the building machine end up in the modules, in panic messages and
+// in C assertions. Replace the two that hold them, the Cargo home and this
+// checkout, so a published module names no user folder.
+const prefixes = [
+	[env.CARGO_HOME ?? join(homedir(), '.cargo'), '/cargo'],
+	[root, '/bread-format'],
+];
+const rustflags = env.CARGO_ENCODED_RUSTFLAGS
+	? env.CARGO_ENCODED_RUSTFLAGS.split('\x1f')
+	: (env.RUSTFLAGS ?? '').split(/\s+/).filter(Boolean);
+for (const [from, to] of prefixes) rustflags.push(`--remap-path-prefix=${from}=${to}`);
+env.CARGO_ENCODED_RUSTFLAGS = rustflags.join('\x1f');
+delete env.RUSTFLAGS;
+for (const [from, to] of prefixes) {
+	for (const path of new Set([from, from.replaceAll('\\', '/')])) {
+		env.CFLAGS_wasm32_unknown_unknown += ` -ffile-prefix-map=${path}=${to}`;
+		env.CXXFLAGS_wasm32_unknown_unknown += ` -ffile-prefix-map=${path}=${to}`;
+	}
+}
 
 const target = env.CARGO_TARGET_DIR ? resolve(root, env.CARGO_TARGET_DIR) : join(root, 'target');
 const built = join(target, 'wasm32-unknown-unknown/wasm/bread_wasm.wasm');
