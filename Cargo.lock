@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "bread-format"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "crc32fast",
  "meshopt",

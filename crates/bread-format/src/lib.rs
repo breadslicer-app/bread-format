@@ -5,7 +5,8 @@
 
 //! Reads and writes `.bread` files: triangle meshes and the scene that places
 //! them, stored small and without losing anything. The format is described in
-//! `SPEC.md` at the root of the repository.
+//! [`SPEC.md`](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md),
+//! in the repository.
 //!
 //! [`read_file`] and [`write_file`] read and write a whole file as a
 //! [`BreadFile`]: the scene, its meshes, and the documents programs keep

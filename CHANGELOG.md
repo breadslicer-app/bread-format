@@ -5,8 +5,17 @@ What changes in each release of the `bread-format` crate. The format itself is d
 later release. Before the freeze, a release could read files of an older release differently,
 and each release said how.
 
-## Unreleased
+## 0.4.0 (2026-11-18)
 
+The first release on crates.io. Files open and are written exactly as in 0.3.0, except for the
+refusal below.
+
+- **On crates.io**, as `bread-format`, with this README and the API docs on docs.rs. A git
+  dependency by tag still works.
+- **STL in:** `read_stl` reads binary and ASCII STL files into a mesh. Corners that are equal bit
+  for bit become one vertex, numbered by first use, so every corner of every triangle comes back
+  exactly, in the STL's order. Facet normals and attribute bytes are not kept. An ASCII STL's solid
+  name becomes the mesh's name, and a binary header that holds text its comment.
 - **Stored bytes must be exactly one Zstandard frame** (`SPEC.md`, section 4.3). The reader used to
   accept several frames in a row, or a frame followed by a skippable one, as long as they
   decompressed to the raw length; such a chunk is now refused as a bad payload, as the spec always

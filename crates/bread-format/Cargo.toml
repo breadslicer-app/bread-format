@@ -1,6 +1,6 @@
 [package]
 name = "bread-format"
-version = "0.3.0"
+version = "0.4.0"
 edition.workspace = true
 license.workspace = true
 authors = ["SynrgStudio"]
@@ -8,8 +8,12 @@ description = "Reads and writes .bread files: tiny, lossless meshes and scenes, 
 categories = ["encoding"]
 keywords = ["3d", "mesh", "lossless", "file-format", "slicer"]
 repository.workspace = true
-# Not published until the crates.io name is settled.
-publish = false
+homepage = "https://bread.synrgs.tech"
+documentation = "https://docs.rs/bread-format"
+readme = "README.md"
+# What goes to crates.io. The tests stay in the repository: they read the
+# conformance files at its root.
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 
 [lints]
 workspace = true
