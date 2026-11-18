@@ -9,6 +9,15 @@ Newest first.
   `valid/metadata`, `valid/metadata-ignored`, `valid/metadata-malformed` and
   `invalid/two-metadata-chunks`.
 
+## 2026-11-18, on crates.io and npm
+
+- The reference implementation is 0.4.0, the first release on crates.io. The JavaScript package is
+  on npm as `bread-format` 0.1.0. `[project]` in `facts.toml` has both versions and links; the
+  Python reader is still not on PyPI.
+- `notes/implementers.md`: the crate comes from crates.io and the package from npm.
+- `rules.md`, rule 6: the page may name and link the two releases. The measurements made with
+  0.3.0 stay as they were measured.
+
 ## 2026-11-13, the top of the page is approved
 
 - `notes/launch.md` is `stable`: Damian approved the top of the page as drafted, with one change:

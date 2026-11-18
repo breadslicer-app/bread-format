@@ -29,9 +29,9 @@ These rules come before everything else in `web/`. Each one says why.
    conformance files as downloads, hosted on the page or linked from the tag `spec-v1`.
    Only the text as of the tag `spec-v1`: a change made after it is shown once a new version of
    the specification is tagged. Wherever the page quotes it, it says it is version 1.
-6. **No release that has not happened.** The crate is not on crates.io, the JavaScript package is
-   not on npm, and the Python reader is not on PyPI. The page does not say they are, or link to
-   them, until `facts.toml` says so.
+6. **No release that has not happened.** The crate is on crates.io and the JavaScript package on
+   npm (`[project]` in `facts.toml` has their versions and links); the Python reader is not on
+   PyPI. The page names a release, or links to it, only once `facts.toml` lists it.
 7. **No number without its source.** Every number on the page comes from `facts.toml`, by its key,
    never typed into the page. A fact that a file in the repository can give has `derive`, and CI
    checks it (`check_facts.py`). A fact measured once says where in its `source`.

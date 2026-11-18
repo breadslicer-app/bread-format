@@ -12,11 +12,11 @@ https://github.com/breadslicer-app/bread-format, under Apache-2.0:
   invalid ones with the reason a reader must give for refusing them ([conformance.md](conformance.md));
 - **the reference implementation**, in Rust, also built to WebAssembly for JavaScript.
 
-**Reading, in Rust.** The crate is not on crates.io yet; it is taken from the repository:
+**Reading, in Rust**, with the crate `bread-format` from crates.io:
 
 ```toml
 [dependencies]
-bread-format = { git = "https://github.com/breadslicer-app/bread-format" }
+bread-format = "0.4"
 ```
 
 ```rust
@@ -30,7 +30,7 @@ for mesh in &file.scene.meshes {
 `bread_format::read_stl` reads an STL into a mesh, and `write_file` writes a file.
 
 **Reading, in JavaScript**, in the browser or Node, through the WebAssembly module (built from
-`bindings/js`, not on npm yet):
+`bindings/js`, on npm as `bread-format`: `npm install bread-format`):
 
 ```js
 import { load, placeMeshes } from 'bread-format';
