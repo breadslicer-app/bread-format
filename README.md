@@ -75,6 +75,7 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`conformance/`](conformance) | Valid and invalid files, each with what a reader must make of it. |
 | [`crates/bread-format`](crates/bread-format) | The reference implementation, in Rust: reads and writes `.bread`, and reads STL. |
 | [`crates/bread-wasm`](crates/bread-wasm) | The same crate built to WebAssembly. |
+| [`crates/bread-thumbnails`](crates/bread-thumbnails) | Thumbnails of `.bread` files in Windows Explorer: a shell thumbnail provider. |
 | [`bindings/js`](bindings/js) | The JavaScript package, for the browser and Node, on that WebAssembly module. |
 | [`python/`](python) | A second reader, in plain Python, written from the specification alone. |
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |

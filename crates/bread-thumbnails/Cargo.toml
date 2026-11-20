@@ -1,0 +1,50 @@
+[package]
+name        = "bread-thumbnails"
+version     = "0.1.0"
+description = "Windows Explorer thumbnails for .bread files: a shell thumbnail provider"
+edition.workspace    = true
+license.workspace    = true
+repository.workspace = true
+authors     = ["SynrgStudio"]
+publish     = false
+
+# A DLL for Explorer, and a library for the tests. On other platforms only
+# the portable part builds: reading the thumbnail and fitting it.
+[lib]
+name       = "bread_thumbnails"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bread-format = { path = "../bread-format" }
+png          = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+windows-core     = "0.62"
+windows-registry = "0.6"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+] }
+
+# The workspace lints, except that unsafe code is denied instead of forbidden:
+# a COM server is unsafe at its edges (raw out pointers, the DLL's exports, a
+# bitmap's bits). `shell.rs` is the only module allowed to, and every unsafe
+# block says why it holds.
+[lints.rust]
+unsafe_code                   = "deny"
+unsafe_op_in_unsafe_fn        = "deny"
+non_ascii_idents              = "deny"
+confusable_idents             = "deny"
+mixed_script_confusables      = "deny"
+uncommon_codepoints           = "deny"
+missing_debug_implementations = "deny"
+unreachable_pub               = "deny"
+unused_qualifications         = "deny"
+
+[lints.clippy]
+all                        = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
