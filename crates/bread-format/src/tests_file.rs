@@ -14,8 +14,13 @@ use crate::file::{
 };
 use crate::mesh::{DecodeMeshError, MESH_TAG, MESH_VERSION};
 use crate::mesh_v2::{Connectivity, MeshCoding, VertexCoding, encode_mesh_v2_with};
+use crate::metadata::{EncodeMetadataError, METADATA_TAG, METADATA_VERSION, MetadataEntry};
 use crate::preview::{
     DecodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION, SupportPreview,
+};
+use crate::role::{
+    DecodeRolesError, EncodeRolesError, ROLE_RAFT, ROLE_SUPPORTS, ROLE_TAG, ROLE_VERSION,
+    RoleEntry, encode_roles,
 };
 use crate::scene::{DecodeSceneError, SCENE_TAG, SCENE_VERSION};
 use crate::surface::{SURFACE_TAG, SURFACE_VERSION, SurfaceEntry};
@@ -48,7 +53,9 @@ fn hollow(model: usize, original: usize, text: &str) -> HollowEntry {
 const THUMBNAIL: &[u8] = b"\x89PNG\r\n\x1a\nthe rest of a picture";
 
 /// The test scene with a thumbnail and settings, and a hollowed model with
-/// supports shown by the leaf with an empty mesh, their preview, and paint.
+/// supports shown by the leaf with an empty mesh, their preview, paint, and
+/// roles: the support leaf named as supports, as it may be, and a raft; and
+/// a title.
 fn file() -> BreadFile {
     BreadFile {
         scene: scene(),
@@ -58,7 +65,13 @@ fn file() -> BreadFile {
         thumbnail: Some(THUMBNAIL.to_vec()),
         support_previews: vec![preview()],
         surface: vec![paint(0, 0), paint(1, 1), paint(1, 2)],
+        roles: vec![role(2, ROLE_SUPPORTS), role(4, ROLE_RAFT)],
+        metadata: vec![MetadataEntry::text(None, "title", "Two wolves")],
     }
+}
+
+fn role(leaf: usize, role: u8) -> RoleEntry {
+    RoleEntry { leaf, role }
 }
 
 fn write(file: &BreadFile) -> Vec<u8> {
@@ -116,10 +129,12 @@ fn chunks_come_in_order() {
         [
             THUMBNAIL_TAG,
             SCENE_TAG,
+            METADATA_TAG,
             SETTINGS_TAG,
             SUPPORTS_TAG,
             HOLLOWS_TAG,
             SURFACE_TAG,
+            ROLE_TAG,
             MESH_TAG,
             MESH_TAG,
             MESH_TAG,
@@ -150,6 +165,8 @@ fn supported_versions_are_the_ones_written() {
         (MESH_TAG, MESH_VERSION),
         (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
         (SURFACE_TAG, SURFACE_VERSION),
+        (ROLE_TAG, ROLE_VERSION),
+        (METADATA_TAG, METADATA_VERSION),
     ] {
         assert_eq!(supported_version(tag), Some(version), "{tag}");
     }
@@ -182,6 +199,8 @@ fn a_newer_version_or_version_0_is_refused() {
         (MESH_TAG, MESH_VERSION),
         (SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION),
         (SURFACE_TAG, SURFACE_VERSION),
+        (ROLE_TAG, ROLE_VERSION),
+        (METADATA_TAG, METADATA_VERSION),
     ] {
         for bad in [0, supported + 1] {
             let changed = rewrite(&bytes, |t, version, payload| {
@@ -518,5 +537,195 @@ fn a_large_damaged_mesh_comes_before_a_fault_after_it() {
     assert!(matches!(
         read_file(damaged.as_slice()),
         Err(ReadFileError::Mesh(DecodeMeshError::Malformed))
+    ));
+}
+
+#[test]
+fn a_reader_that_skips_the_roles_sees_the_same_file() {
+    let file = file();
+    let back = read_file(without(&write(&file), ROLE_TAG).as_slice()).unwrap();
+    assert_eq!(
+        back,
+        BreadFile {
+            roles: Vec::new(),
+            ..file
+        }
+    );
+}
+
+#[test]
+fn roles_must_name_leaves_once_with_a_known_role() {
+    for (roles, expected) in [
+        (vec![role(3, ROLE_RAFT)], EncodeRolesError::NotALeaf),
+        (
+            vec![role(4, ROLE_RAFT), role(4, ROLE_SUPPORTS)],
+            EncodeRolesError::SameLeaf,
+        ),
+        (vec![role(4, 7)], EncodeRolesError::ReservedRole),
+    ] {
+        let file = BreadFile { roles, ..file() };
+        assert!(matches!(
+            write_file(&file, Vec::new()),
+            Err(WriteFileError::Roles(err)) if err == expected
+        ));
+    }
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        if tag == ROLE_TAG {
+            vec![(tag, version, payload[..payload.len() - 1].to_vec())]
+        } else {
+            vec![(tag, version, payload)]
+        }
+    });
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::Roles(DecodeRolesError::Malformed))
+    ));
+}
+
+#[test]
+fn a_reserved_role_is_read_as_it_is() {
+    let file = file();
+    let mut reserved = file.clone();
+    reserved.roles[1].role = 200;
+    let payload = {
+        // A writer may not write it, so the payload is made by hand.
+        let mut payload = encode_roles(&file.roles, &file.scene).unwrap();
+        let last = payload.len() - 1;
+        payload[last] = 200;
+        payload
+    };
+    let bytes = rewrite(&write(&file), |tag, version, original| {
+        let payload = if tag == ROLE_TAG {
+            payload.clone()
+        } else {
+            original
+        };
+        vec![(tag, version, payload)]
+    });
+    assert_eq!(read_file(bytes.as_slice()).unwrap(), reserved);
+}
+
+#[test]
+fn roles_may_not_contradict_supports_or_hollows() {
+    // Leaf 2 shows supports, and leaf 1 is the model of the supports and
+    // of the hollow.
+    for roles in [
+        vec![role(2, ROLE_RAFT)],
+        vec![role(1, ROLE_SUPPORTS)],
+        vec![role(1, ROLE_RAFT)],
+    ] {
+        let leaf = roles[0].leaf;
+        let broken = BreadFile {
+            roles: roles.clone(),
+            ..file()
+        };
+        assert!(matches!(
+            write_file(&broken, Vec::new()),
+            Err(WriteFileError::RoleConflict { leaf: l }) if l == leaf
+        ));
+        // The role chunk is fine on its own; only with the others it breaks
+        // the rule.
+        let payload = encode_roles(&roles, &broken.scene).unwrap();
+        let bytes = rewrite(&write(&file()), |tag, version, original| {
+            let payload = if tag == ROLE_TAG {
+                payload.clone()
+            } else {
+                original
+            };
+            vec![(tag, version, payload)]
+        });
+        assert!(matches!(
+            read_file(bytes.as_slice()),
+            Err(ReadFileError::RoleConflict { leaf: l }) if l == leaf
+        ));
+    }
+    // A reserved role means a model, so it contradicts nothing.
+    let mut payload = encode_roles(&[role(1, ROLE_RAFT)], &file().scene).unwrap();
+    payload[8] = 9;
+    let bytes = rewrite(&write(&file()), |tag, version, original| {
+        let payload = if tag == ROLE_TAG {
+            payload.clone()
+        } else {
+            original
+        };
+        vec![(tag, version, payload)]
+    });
+    assert_eq!(read_file(bytes.as_slice()).unwrap().roles, [role(1, 9)]);
+}
+
+#[test]
+fn two_role_chunks_are_refused() {
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        let copies = if tag == ROLE_TAG { 2 } else { 1 };
+        vec![(tag, version, payload); copies]
+    });
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::ChunkCount {
+            tag: ROLE_TAG,
+            count: 2
+        })
+    ));
+}
+
+#[test]
+fn a_reader_that_skips_the_metadata_sees_the_same_file() {
+    let file = file();
+    let back = read_file(without(&write(&file), METADATA_TAG).as_slice()).unwrap();
+    assert_eq!(
+        back,
+        BreadFile {
+            metadata: Vec::new(),
+            ..file
+        }
+    );
+}
+
+#[test]
+fn metadata_a_writer_must_not_write_is_refused() {
+    let mut file = file();
+    file.metadata.push(MetadataEntry::text(
+        Some(9),
+        "title",
+        "a node that is not there",
+    ));
+    assert!(matches!(
+        write_file(&file, Vec::new()),
+        Err(WriteFileError::Metadata(EncodeMetadataError::NoSuchNode {
+            node: 9
+        }))
+    ));
+}
+
+#[test]
+fn malformed_metadata_is_read_as_none() {
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        if tag == METADATA_TAG {
+            vec![(tag, version, payload[..payload.len() - 1].to_vec())]
+        } else {
+            vec![(tag, version, payload)]
+        }
+    });
+    assert_eq!(
+        read_file(bytes.as_slice()).unwrap(),
+        BreadFile {
+            metadata: Vec::new(),
+            ..file()
+        }
+    );
+}
+
+#[test]
+fn two_metadata_chunks_are_refused() {
+    let bytes = rewrite(&write(&file()), |tag, version, payload| {
+        let copies = if tag == METADATA_TAG { 2 } else { 1 };
+        vec![(tag, version, payload); copies]
+    });
+    assert!(matches!(
+        read_file(bytes.as_slice()),
+        Err(ReadFileError::ChunkCount {
+            tag: METADATA_TAG,
+            count: 2
+        })
     ));
 }

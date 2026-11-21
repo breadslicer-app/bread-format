@@ -71,9 +71,11 @@ not know, so programs can keep data of their own beside the official chunks.
 
 | Folder | What |
 |---|---|
-| [`SPEC.md`](SPEC.md) | The specification, version 1, frozen (tag `spec-v1`). |
+| [`SPEC.md`](SPEC.md) | The specification, version 2, frozen (tag `spec-v2`); version 1 is the tag `spec-v1`. |
 | [`conformance/`](conformance) | Valid and invalid files, each with what a reader must make of it. |
 | [`crates/bread-format`](crates/bread-format) | The reference implementation, in Rust: reads and writes `.bread`, and reads STL. |
+| [`apps/converter`](apps/converter) | Bread Converter, a desktop program: STL to `.bread` and back, many files at once, in Breadslicer's look. |
+| [`crates/bread-cli`](crates/bread-cli) | `bread`, a command-line program: STL to `.bread` and back, and what a file holds. |
 | [`crates/bread-wasm`](crates/bread-wasm) | The same crate built to WebAssembly. |
 | [`crates/bread-thumbnails`](crates/bread-thumbnails) | Thumbnails of `.bread` files in Windows Explorer: a shell thumbnail provider. |
 | [`bindings/js`](bindings/js) | The JavaScript package, for the browser and Node, on that WebAssembly module. |
@@ -81,11 +83,13 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |
 | [`tools/corpus-bench`](tools/corpus-bench) | Measures `.bread` on a folder of STL files. |
 
-None of them is published to a package registry yet. To use the crate, take it from here:
+The crate is on [crates.io](https://crates.io/crates/bread-format) and the JavaScript package on
+[npm](https://www.npmjs.com/package/bread-format), both as `bread-format`. The Python reader is not
+on a package registry.
 
 ```toml
 [dependencies]
-bread-format = { git = "https://github.com/breadslicer-app/bread-format" }
+bread-format = "0.4"
 ```
 
 ```rust
@@ -105,6 +109,8 @@ The JavaScript package and the Python reader say how to build and use them in th
 - **[Caliper](https://caliper.synrgs.tech)**, a mesh repair program, opens and saves `.bread` since
   version 0.9.6.
 - **The viewer** at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/).
+- **[`bread`](crates/bread-cli)**, the command-line program in this repository.
+- **[Bread Converter](apps/converter)**, the desktop converter in this repository.
 
 To write a reader of your own, start from [`SPEC.md`](SPEC.md) and check it against
 [`conformance/`](conformance).

@@ -1,7 +1,8 @@
 # The `.bread` file format
 
-**Status:** version 1, frozen (tag `spec-v1`). From here on, what this document describes changes only
-through new versions ([3.6](#36-stability)).
+**Status:** version 2, frozen (tag `spec-v2`). It adds the role and metadata chunks to version 1
+(tag `spec-v1`) and changes nothing version 1 describes. From here on, what this document describes
+changes only through new versions ([3.6](#36-stability)).
 
 ## 1. Introduction
 
@@ -123,11 +124,14 @@ plate is up to the program that prints it.
 
 ### 3.6 Stability
 
-This is version 1 of this document. Every layout it describes is fixed: the container's, and each
-chunk version's in the [chunk registry](#71-official-chunks). A change to one is made as a new
-version of it ([Versions](#34-versions)), or as a new chunk, never by editing the version described
-here. A new version of this document may add chunks and versions, and may say more where this text
-is unclear, but a file that is valid by this document stays valid, and means the same.
+This is version 2 of this document. Version 1, frozen at the tag `spec-v1`, describes the container
+and the chunks up to `SURF`; version 2 adds the role chunk ([11](#11-roles-role)) and the metadata
+chunk ([12](#12-metadata-meta)), and changes nothing else. Every layout described here is fixed: the
+container's, and each chunk version's in the [chunk registry](#71-official-chunks). A change to one
+is made as a new version of it ([Versions](#34-versions)), or as a new chunk, never by editing the
+version described here. A new version of this document may add chunks and versions, and may say more
+where this text is unclear, but a file that is valid by an earlier version stays valid, and means
+the same.
 
 A reader that supports a later version of the container or of a chunk SHOULD keep reading the
 versions described here, so that a file written today keeps opening. For `MESH` this is a
@@ -135,8 +139,10 @@ requirement: a reader that reads it MUST read versions 1 and 2 ([6.6](#66-versio
 exception is version 1 of `SUPP` and `HOLW`, written only while this document was a draft, which a
 reader MAY skip ([7.3](#73-application-chunks)).
 
-The conformance files in `conformance/` belong to this version: a reader of version 1 reads each
-valid file as its description says, and refuses each invalid one for its reason.
+The conformance files in `conformance/` belong to this version: a reader of version 2 reads each
+valid file as its description says, and refuses each invalid one for its reason. A reader of
+version 1 skips the chunks version 2 adds, so the invalid files that are invalid only because of
+one of them are not invalid to it.
 
 ## 4. Container
 
@@ -656,6 +662,8 @@ file](#44-reading-a-file)).
 | `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
 | `SPRV` | 1 | at most one | a preview of the supports, for readers that skip `SUPP` | [9](#9-support-preview-sprv) |
 | `SURF` | 1 | at most one | paint on the faces of models | [10](#10-surface-paint-surf) |
+| `ROLE` | 1 | at most one | what each leaf is: a model, supports or a raft | [11](#11-roles-role) |
+| `META` | 1 | at most one | who made the file, its license, and lasting ids for its parts | [12](#12-metadata-meta) |
 
 *Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
 that holds a different number of chunks of that tag than *Per file* allows.
@@ -909,3 +917,119 @@ A program that changes a leaf's mesh and writes the file back SHOULD repaint it,
 Leaving it is harmless, since the fingerprint no longer matches, but it takes room for nothing.
 
 A reader that skips `SURF` reads the same scene, without the paint.
+
+## 11. Roles (`ROLE`)
+
+A scene's leaves are not all models: some show supports, and some a raft that several models stand
+on. A slicer treats them apart, for example when it makes models a little larger to make up for
+shrinking and leaves supports as they are. The role chunk says which leaves are not models. It is
+optional: a leaf it does not name is a model, so a file of models alone needs none. This section
+describes chunk version 1.
+
+A support leaf of a [`SUPP`](#supp-supports) entry is a support whether this chunk names it or not.
+The role chunk is for the other leaves that are not models: supports kept as a mesh, such as ones
+made by another program, and rafts.
+
+### 11.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| entries | count | how many entries follow |
+| leaf | `u32` | the node index of a leaf in the scene chunk ([5](#5-scene-scne)) |
+| role | `u8` | what the leaf is: `1` supports, `2` a raft |
+
+The last two fields repeat for every entry, so each entry takes 5 bytes. Roles 0 and 3 to 255 are
+reserved.
+
+A writer:
+
+- MUST name leaves only, and MUST NOT write two entries with the same leaf;
+- MUST NOT write a reserved role;
+- MUST NOT give the role of a raft to a support leaf of a `SUPP` entry, and MUST NOT give a role to
+  the model of a `SUPP` or [`HOLW`](#holw-hollowed-models) entry, which is a model;
+- MAY name a support leaf of a `SUPP` entry with the role of supports, which it has anyway;
+- SHOULD write the entries in increasing order of leaf, and the chunk after the surface paint chunk
+  and before the `MESH` chunks.
+
+### 11.2 Reading it
+
+A reader that reads `ROLE`:
+
+- MUST refuse the file if an entry names no node of the scene or a node that is not a leaf, or if two
+  entries name the same leaf;
+- MUST refuse the file if an entry gives the role of a raft to a support leaf of a `SUPP` entry, or
+  gives the role of supports or of a raft to the model of a `SUPP` or `HOLW` entry;
+- MUST NOT refuse the file for a reserved role. It SHOULD treat such an entry as absent, so the leaf
+  is a model to it.
+
+A reader that reads `SUPP` but not `ROLE` knows the support leaves of `SUPP` entries, and takes every
+other leaf for a model. A reader that skips both takes every leaf for a model.
+
+## 12. Metadata (`META`)
+
+Metadata says who made a file and how it may be used, and gives its parts lasting ids: what a shop,
+a designer or a print farm needs to travel with the model. It is optional, and nothing else in the
+file depends on it. A reader may ignore all of it, and a program may strip it, for example to remove
+a designer's name, without changing what the file shows. It is not the name and comment that the
+scene, its nodes and its meshes carry ([5.1](#51-layout), [6.2](#62-layout)), which belong to what
+they name. This section describes chunk version 1.
+
+### 12.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| entries | count | how many entries follow |
+| subject | `u32` | what the entry is about: a node index in the scene chunk ([5](#5-scene-scne)), or `FFFFFFFF` for the whole file |
+| key | byte string | what the value is, as below |
+| value | byte string | the value |
+
+The last three fields repeat for every entry, so each entry takes at least 12 bytes.
+
+A key is 1 to 64 bytes of lowercase ASCII letters, digits, `.`, `-` and `_`, the first of them a
+letter. A key without a dot is registered: this document lists it, with its value, in the table
+below. Keys without a dot that the table does not list are reserved. A key with a dot belongs to a
+program, which starts it with its own name, such as `breadslicer.printer`; its value is whatever
+that program makes of it.
+
+| Key | Value |
+|---|---|
+| `title` | the title, as text |
+| `description` | a description, as text |
+| `designer` | who designed it, as text |
+| `copyright` | a copyright notice, as text, such as `© 2026 A. Designer` |
+| `license` | the license, as an [SPDX license expression](https://spdx.org/licenses/), such as `CC-BY-4.0` |
+| `source` | where it comes from, as a URL |
+| `created` | when it was made, as an [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) date and time, such as `2026-11-21T14:30:00Z` |
+| `generator` | the program that wrote the file, as text, such as `Breadslicer 0.9` |
+| `uuid` | a lasting id, as the 16 bytes of an [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562) UUID, in the order that RFC gives |
+
+Text is UTF-8. Every registered key may be about the whole file or about a node: a kit can name a
+designer for each part, and give each part its own id. A `uuid` stays with its node or file through
+every copy and every program that keeps the chunk, so a print farm can follow a part. A program that
+makes a new part, rather than changing one, gives it a new id.
+
+A writer:
+
+- MUST NOT write a reserved key, and MUST NOT write two entries with the same subject and key;
+- MUST write each registered key's value as the table says: valid UTF-8 for text, and exactly 16
+  bytes for `uuid`;
+- MUST name nodes that exist;
+- SHOULD write the entries about the file first, then those about nodes in increasing order of
+  node, and the chunk right after the scene chunk, so that a program that only wants the metadata
+  reads two chunks.
+
+### 12.2 Reading it
+
+A reader MUST NOT refuse a file for what its metadata holds. The rules of the container still hold
+for the chunk ([4.4](#44-reading-a-file)), and so does its count: a file holds at most one `META`
+chunk ([7.1](#71-official-chunks)). Then:
+
+- A payload that is malformed ([3.3](#33-malformed-payloads)) is read as no metadata at all.
+- Each entry that breaks a rule of 12.1 is read as absent: one whose subject is not a node and not
+  `FFFFFFFF`, whose key is not a key or is reserved, or whose value is not what its registered key
+  takes. Of two entries with the same subject and key, the second is read as absent.
+- A reader SHOULD keep the entries of program keys it does not know when it writes the file back,
+  with the rest of the chunk.
+
+A program that changes a node keeps its metadata. A program that writes a file back without some of
+its nodes drops the entries about them.

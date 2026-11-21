@@ -2,6 +2,36 @@
 
 Newest first.
 
+## 2026-11-21, the crate's version on crates.io
+
+- New fact, `[project] crate_version`: 0.4.0, the newest release of the crate on crates.io, for
+  the Cargo.toml snippet and the packages row. `version` stays the newest tag, 0.5.0.
+
+## 2026-11-21, release 0.5.0 and the specification's version 2
+
+- `[project]`: the reference implementation is 0.5.0 (tag `v0.5.0`), with 0.4.0 among the earlier
+  versions. The crate on crates.io and the package on npm stay 0.4.0 and 0.1.0 until they are
+  published again. `chunk_versions` gains `ROLE` and `META`, version 1 each, and the
+  specification is version 2, frozen at the tag `spec-v2`.
+- `rules.md`, rule 5: the page quotes the specification as of `spec-v2`.
+- `notes/faq.md` and `notes/implementers.md`: the specification is version 2.
+
+## 2026-11-21, conformance files for roles and metadata
+
+- `conformance_valid` is 22 and `conformance_invalid` 24: version 2 of the spec adds the role
+  chunk, with `valid/roles` and four invalid `role-*` files, and the metadata chunk, with
+  `valid/metadata`, `valid/metadata-ignored`, `valid/metadata-malformed` and
+  `invalid/two-metadata-chunks`.
+
+## 2026-11-18, on crates.io and npm
+
+- The reference implementation is 0.4.0, the first release on crates.io. The JavaScript package is
+  on npm as `bread-format` 0.1.0. `[project]` in `facts.toml` has both versions and links; the
+  Python reader is still not on PyPI.
+- `notes/implementers.md`: the crate comes from crates.io and the package from npm.
+- `rules.md`, rule 6: the page may name and link the two releases. The measurements made with
+  0.3.0 stay as they were measured.
+
 ## 2026-11-13, the top of the page is approved
 
 - `notes/launch.md` is `stable`: Damian approved the top of the page as drafted, with one change:

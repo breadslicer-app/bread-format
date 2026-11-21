@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from .container import RawChunk, decompress, split_chunks
 from .errors import BreadError, Malformed, NoSuchVertex
 from .mesh import Mesh, read_mesh
+from .metadata import MetaEntry, read_metadata
 from .scene import Scene, read_scene
-from .slicer import Entry, Paint, read_entries, read_paint, read_previews
+from .slicer import Entry, Paint, Role, read_entries, read_paint, read_previews, read_roles
 
 #: The chunk versions this reader reads, by tag (SPEC 7.1).
 VERSIONS = {
@@ -24,6 +25,8 @@ VERSIONS = {
     b"HOLW": (1, 2),
     b"SPRV": (1,),
     b"SURF": (1,),
+    b"ROLE": (1,),
+    b"META": (1,),
 }
 
 #: How many chunks of each tag a file holds: (at least, at most).
@@ -37,8 +40,9 @@ class BreadFile:
     ``settings`` is the PROJ payload, a TOML document, and ``thumbnail`` the
     THMB payload, a PNG; each is None when the file has none. ``supports``
     and ``hollows`` are the SUPP and HOLW entries, ``support_previews`` maps
-    each support leaf with a preview to its mesh, and ``surface`` holds the
-    SURF entries."""
+    each support leaf with a preview to its mesh, ``surface`` holds the SURF
+    entries, ``roles`` the ROLE entries: the leaves that are not models, and
+    ``metadata`` the META entries a reader keeps."""
 
     scene: Scene
     meshes: list[Mesh]
@@ -48,6 +52,8 @@ class BreadFile:
     hollows: list[Entry]
     support_previews: dict[int, Mesh]
     surface: list[Paint]
+    roles: list[Role]
+    metadata: list[MetaEntry]
 
     def placements(self):
         """Every mesh shown, with its world transform (SPEC 5.4)."""
@@ -120,7 +126,23 @@ def read_file(data: bytes) -> BreadFile:
                 raise BreadError("malformed", "SURF")
             seen.add((paint.leaf, paint.kind))
 
-    return BreadFile(scene, meshes, settings, thumbnail, supports, hollows, previews, surface)
+    roles: list[Role] = []
+    if c := one(b"ROLE"):
+        roles = _guard("ROLE", read_roles, payload(c))
+        support_leaves = {entry.part for entry in supports}
+        models = {entry.model for entry in supports} | {entry.model for entry in hollows}
+        seen = set()
+        for role in roles:
+            if not _is_leaf(scene, role.leaf) or role.leaf in seen:
+                raise BreadError("malformed", "ROLE")
+            seen.add(role.leaf)
+            # A reserved role means a model, which contradicts nothing (SPEC 11.2).
+            if role.is_known and (role.leaf in models or (role.role == 2 and role.leaf in support_leaves)):
+                raise BreadError("malformed", "ROLE")
+
+    metadata = read_metadata(payload(c), len(scene.nodes)) if (c := one(b"META")) else []
+
+    return BreadFile(scene, meshes, settings, thumbnail, supports, hollows, previews, surface, roles, metadata)
 
 
 def _guard(tag: str, read, *args):

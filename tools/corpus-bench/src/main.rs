@@ -305,6 +305,8 @@ fn one_leaf(mesh: Mesh) -> BreadFile {
         thumbnail: None,
         support_previews: Vec::new(),
         surface: Vec::new(),
+        roles: Vec::new(),
+        metadata: Vec::new(),
     }
 }
 

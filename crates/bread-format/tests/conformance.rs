@@ -25,10 +25,10 @@ use std::path::{Path, PathBuf};
 
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, Connectivity, DecodeMeshError, DecodeSceneError,
-    HollowEntry, MESH_TAG, Mesh, MeshCoding, Meta, Node, NodeKind, ReadBreadError, ReadFileError,
-    SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry,
-    THUMBNAIL_TAG, Transform, VertexCoding, encode_mesh, encode_mesh_v2_with, read_file,
-    write_file,
+    HollowEntry, MESH_TAG, METADATA_TAG, Mesh, MeshCoding, Meta, MetadataEntry, Node, NodeKind,
+    ROLE_RAFT, ROLE_SUPPORTS, ROLE_TAG, ReadBreadError, ReadFileError, RoleEntry, SCENE_TAG,
+    SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry, THUMBNAIL_TAG,
+    Transform, VertexCoding, encode_mesh, encode_mesh_v2_with, read_file, write_file,
 };
 use sha2::{Digest, Sha256, Sha384};
 
@@ -144,6 +144,42 @@ const CASES: &[Case] = &[
                       by its fingerprint.",
         file: surface_paint,
         skipped: &[],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "roles",
+        description: "A triangle on supports kept as data, beside supports made by another \
+                      program and a raft, both kept as meshes. The role chunk names the posts \
+                      leaf as supports and the plate leaf as a raft; the triangle is a model, \
+                      and the supports leaf shows supports because a supports entry names it.",
+        file: roles,
+        skipped: &[],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "metadata",
+        description: "The two parts with metadata: every registered key about the whole file, a \
+                      title and an id for the base, an id and a program's own key for the lid.",
+        file: metadata,
+        skipped: &[],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "metadata-ignored",
+        description: "The triangle file with a metadata chunk whose seven entries a reader reads \
+                      as absent: a reserved key, two that are not keys, a designer that is not \
+                      UTF-8, an id of 15 bytes, a title about node 9, which the scene does not \
+                      have, and a second designer about the file. The file has no metadata.",
+        file: triangle,
+        skipped: &[(METADATA_TAG, 1, METADATA_IGNORED)],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "metadata-malformed",
+        description: "The triangle file with a metadata chunk that counts two entries and holds \
+                      one: a reader reads a malformed payload as no metadata at all.",
+        file: triangle,
+        skipped: &[(METADATA_TAG, 1, METADATA_MALFORMED)],
         meshes: Writing::Auto,
     },
     Case {
@@ -458,6 +494,102 @@ fn slicer_data() -> BreadFile {
         thumbnail: None,
         support_previews: Vec::new(),
         surface: Vec::new(),
+        roles: Vec::new(),
+        metadata: Vec::new(),
+    }
+}
+
+/// Metadata entries that a reader reads as absent, one per rule of
+/// `SPEC.md`, 12.2, about the triangle file.
+const METADATA_IGNORED: &[u8] = b"\x07\x00\x00\x00\xff\xff\xff\xff\x06\x00\x00\x00colour\x03\x00\x00\x00red\xff\xff\xff\xff\x05\x00\x00\x00Title\x01\x00\x00\x00x\xff\xff\xff\xff\x00\x00\x00\x00\x01\x00\x00\x00x\xff\xff\xff\xff\x08\x00\x00\x00designer\x02\x00\x00\x00\xff\xfe\xff\xff\xff\xff\x04\x00\x00\x00uuid\x0f\x00\x00\x00\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x01\x09\x00\x00\x00\x05\x00\x00\x00title\x04\x00\x00\x00lost\xff\xff\xff\xff\x08\x00\x00\x00designer\x06\x00\x00\x00second";
+
+/// A metadata payload that counts two entries and holds one.
+const METADATA_MALFORMED: &[u8] =
+    b"\x02\x00\x00\x00\xff\xff\xff\xff\x05\x00\x00\x00title\x03\x00\x00\x00cut";
+
+/// The two parts, with metadata about the file and about each leaf.
+fn metadata() -> BreadFile {
+    let file = None;
+    let base = Some(0);
+    let lid = Some(1);
+    let metadata = vec![
+        MetadataEntry::text(file, "title", "Box with a lid"),
+        MetadataEntry::text(file, "description", "A test box, in two parts."),
+        MetadataEntry::text(file, "designer", "A. Designer"),
+        MetadataEntry::text(file, "copyright", "\u{a9} 2026 A. Designer"),
+        MetadataEntry::text(file, "license", "CC-BY-4.0"),
+        MetadataEntry::text(file, "source", "https://example.com/box"),
+        MetadataEntry::text(file, "created", "2026-11-21T14:30:00Z"),
+        MetadataEntry::text(file, "generator", "bread-format conformance"),
+        MetadataEntry::uuid(
+            file,
+            *b"\x1b\x4e\x28\xba\x2f\xa1\x41\xd2\x88\x3f\x0a\x40\x7f\x2b\x5c\x01",
+        ),
+        MetadataEntry::text(base, "title", "Base"),
+        MetadataEntry::uuid(
+            base,
+            *b"\x1b\x4e\x28\xba\x2f\xa1\x41\xd2\x88\x3f\x0a\x40\x7f\x2b\x5c\x02",
+        ),
+        MetadataEntry::uuid(
+            lid,
+            *b"\x1b\x4e\x28\xba\x2f\xa1\x41\xd2\x88\x3f\x0a\x40\x7f\x2b\x5c\x03",
+        ),
+        MetadataEntry {
+            node: lid,
+            key: "example.note".into(),
+            value: vec![0, 1, 2, 255],
+        },
+    ];
+    BreadFile {
+        metadata,
+        ..two_parts()
+    }
+}
+
+/// A triangle on supports kept as data, and two leaves that are not models
+/// but whose meshes are kept: supports from another program and a raft. Their
+/// names say nothing; the role chunk does.
+fn roles() -> BreadFile {
+    let empty = Mesh {
+        meta: None,
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![
+                triangle_mesh([0, 1, 2]),
+                empty,
+                cube_mesh("imported"),
+                cube_mesh("plate"),
+            ],
+            nodes: vec![
+                leaf(named("model"), None, 0),
+                leaf(named("supports"), None, 1),
+                leaf(named("posts"), None, 2),
+                leaf(named("plate"), None, 3),
+            ],
+            roots: vec![0, 1, 2, 3],
+            ..Scene::default()
+        },
+        supports: vec![SupportEntry {
+            model: 0,
+            support: 1,
+            generator: "example".into(),
+            version: 1,
+            document: b"supports document".to_vec(),
+        }],
+        roles: vec![
+            RoleEntry {
+                leaf: 2,
+                role: ROLE_SUPPORTS,
+            },
+            RoleEntry {
+                leaf: 3,
+                role: ROLE_RAFT,
+            },
+        ],
+        ..BreadFile::default()
     }
 }
 
@@ -743,6 +875,19 @@ fn payload(payload: Option<&[u8]>) -> Json {
 }
 
 /// The JSON that describes `file`.
+/// A UUID in its usual text form: lowercase hex, grouped 8-4-4-4-12.
+fn uuid_text(uuid: [u8; 16]) -> String {
+    let hex: String = uuid.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
+}
+
 fn describe(description: &str, file: &BreadFile) -> String {
     let scene = &file.scene;
     let settings = payload(file.settings.as_deref());
@@ -764,6 +909,26 @@ fn describe(description: &str, file: &BreadFile) -> String {
         Json::Object(vec![
             ("leaf", Json::index(preview.leaf)),
             ("mesh", mesh(&preview.mesh)),
+        ])
+    });
+    let metadata = file.metadata.iter().map(|entry| {
+        let value = if let Some(uuid) = entry.as_uuid() {
+            Json::Text(uuid_text(uuid))
+        } else if let Some(text) = entry.as_text() {
+            Json::text(text)
+        } else {
+            payload(Some(&entry.value))
+        };
+        Json::Object(vec![
+            ("subject", Json::or_null(entry.node, Json::index)),
+            ("key", Json::text(&entry.key)),
+            ("value", value),
+        ])
+    });
+    let roles = file.roles.iter().map(|entry| {
+        Json::Object(vec![
+            ("leaf", Json::index(entry.leaf)),
+            ("role", Json::int(u32::from(entry.role))),
         ])
     });
     let surface = file.surface.iter().map(|entry| {
@@ -792,6 +957,8 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ("thumbnail", payload(file.thumbnail.as_deref())),
         ("support_previews", Json::List(previews.collect())),
         ("surface", Json::List(surface.collect())),
+        ("roles", Json::List(roles.collect())),
+        ("metadata", Json::List(metadata.collect())),
     ]);
     let mut out = String::new();
     json.write(&mut out, 0);
@@ -1098,6 +1265,45 @@ const INVALID: &[Invalid] = &[
         reason: "malformed",
         chunk: Some(MESH_TAG),
         bytes: mesh_rans_too_many_vertices,
+    },
+    Invalid {
+        name: "two-metadata-chunks",
+        description: "The metadata file with its metadata chunk written twice.",
+        reason: "chunk-count",
+        chunk: Some(METADATA_TAG),
+        bytes: two_metadata_chunks,
+    },
+    Invalid {
+        name: "role-no-such-leaf",
+        description: "The roles file with its raft entry naming node 9, which the scene does not \
+                      have.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_no_such_leaf,
+    },
+    Invalid {
+        name: "role-same-leaf",
+        description: "The roles file with both entries naming the posts leaf, one as supports and \
+                      one as a raft.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_same_leaf,
+    },
+    Invalid {
+        name: "role-raft-on-supports",
+        description: "The roles file with its raft entry naming the supports leaf, which a \
+                      supports entry already names as supports.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_raft_on_supports,
+    },
+    Invalid {
+        name: "role-on-a-model",
+        description: "The roles file with its raft entry naming the triangle, the model of a \
+                      supports entry.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_on_a_model,
     },
 ];
 
@@ -1483,6 +1689,55 @@ fn huge_vertex_count() -> Vec<u8> {
     file_of(&chunks)
 }
 
+/// The roles file with its role payload replaced by `entries`, each a leaf
+/// and a role.
+fn roles_with(entries: &[(u32, u8)]) -> Vec<u8> {
+    let bytes = write_file(&roles(), Vec::new()).expect("the roles case writes");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut chunks = Vec::new();
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        let mut payload = chunk.payload;
+        if chunk.tag == ROLE_TAG {
+            payload = (entries.len() as u32).to_le_bytes().to_vec();
+            for &(leaf, role) in entries {
+                payload.extend(leaf.to_le_bytes());
+                payload.push(role);
+            }
+        }
+        chunks.push((chunk.tag, chunk.version, payload));
+    }
+    file_of(&chunks)
+}
+
+fn two_metadata_chunks() -> Vec<u8> {
+    let bytes = write_file(&metadata(), Vec::new()).expect("the metadata case writes");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut chunks = Vec::new();
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        if chunk.tag == METADATA_TAG {
+            chunks.push((chunk.tag, chunk.version, chunk.payload.clone()));
+        }
+        chunks.push((chunk.tag, chunk.version, chunk.payload));
+    }
+    file_of(&chunks)
+}
+
+fn role_no_such_leaf() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (9, ROLE_RAFT)])
+}
+
+fn role_same_leaf() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (2, ROLE_RAFT)])
+}
+
+fn role_raft_on_supports() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (1, ROLE_RAFT)])
+}
+
+fn role_on_a_model() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (0, ROLE_RAFT)])
+}
+
 /// The reason code of `err`, and the chunk it is about, as the README names
 /// them.
 fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
@@ -1499,6 +1754,9 @@ fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
             ("no-such-vertex", Some(MESH_TAG))
         }
         ReadFileError::Scene(DecodeSceneError::Malformed) => ("malformed", Some(SCENE_TAG)),
+        ReadFileError::Roles(_) | ReadFileError::RoleConflict { .. } => {
+            ("malformed", Some(ROLE_TAG))
+        }
         other => panic!("no conformance file expects this error: {other}"),
     }
 }

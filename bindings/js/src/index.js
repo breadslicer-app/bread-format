@@ -135,6 +135,33 @@ function encodeScene(scene, meshCount) {
 /** Where `bread_mesh_text_len` says a mesh has no such text. */
 const NO_TEXT = 0xffffffff;
 
+/** The role of a leaf that shows supports (SPEC.md 11). */
+export const ROLE_SUPPORTS = 1;
+
+/** The role of a leaf that shows a raft (SPEC.md 11). */
+export const ROLE_RAFT = 2;
+
+/** The registered metadata keys whose value is text (SPEC.md 12.1). */
+export const METADATA_TEXT_KEYS = Object.freeze([
+	'title',
+	'description',
+	'designer',
+	'copyright',
+	'license',
+	'source',
+	'created',
+	'generator',
+]);
+
+/** The subject of a metadata entry about the whole file, in the module. */
+const WHOLE_FILE = 0xffffffff;
+
+/** A UUID's 16 bytes in their usual text form: lowercase hex, 8-4-4-4-12. */
+function uuidText(bytes) {
+	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /** What `bread_scene_has_meta` and `bread_scene_text` call the scene itself. */
 const SCENE_ITSELF = -1;
 
@@ -356,6 +383,131 @@ export class Bread {
 		} finally {
 			x.bread_release();
 		}
+	}
+
+	/**
+	 * The roles of a file (SPEC.md 11): the leaves that are not models, each
+	 * with its role, `ROLE_SUPPORTS` or `ROLE_RAFT`. A leaf not listed is a
+	 * model, and a support leaf of a supports entry is supports anyway. Other
+	 * role numbers are reserved and mean a model. The roles are checked
+	 * against the scene, and against the supports and hollows chunks when
+	 * the file has them.
+	 *
+	 * @param {{ tag: string, version: number, payload: Uint8Array }[]} chunks as `readChunks` gives them
+	 * @returns {{ leaf: number, role: number }[]} empty when the file has no role chunk
+	 * @throws {BreadError} when the roles are refused, or the file holds more
+	 *   than one role, supports or hollows chunk, or not exactly one scene
+	 *   chunk
+	 */
+	decodeRoles(chunks) {
+		const found = this.#atMostOne(chunks, 'ROLE');
+		if (found === null) return [];
+		const scene = this.#theScene(chunks);
+		const supports = this.#atMostOne(chunks, 'SUPP');
+		const hollows = this.#atMostOne(chunks, 'HOLW');
+		const meshCount = chunks.filter((chunk) => chunk.tag === 'MESH').length;
+		const none = new Uint8Array(0);
+		const x = this.#x;
+		const read = this.#withInput(found.payload, (p, pLen) =>
+			this.#withInput(scene.payload, (s, sLen) =>
+				this.#withInput(supports?.payload ?? none, (u, uLen) =>
+					this.#withInput(hollows?.payload ?? none, (h, hLen) =>
+						x.bread_decode_roles(
+							found.version,
+							p,
+							pLen,
+							scene.version,
+							s,
+							sLen,
+							meshCount,
+							supports?.version ?? 0,
+							u,
+							uLen,
+							hollows?.version ?? 0,
+							h,
+							hLen,
+						),
+					),
+				),
+			),
+		);
+		try {
+			if (!read) throw this.#refusal();
+			const roles = [];
+			for (let i = 0, n = u32(x.bread_role_count()); i < n; i++) {
+				roles.push({ leaf: u32(x.bread_role_leaf(i)), role: x.bread_role_value(i) });
+			}
+			return roles;
+		} finally {
+			x.bread_release();
+		}
+	}
+
+	/**
+	 * The metadata of a file (SPEC.md 12): who made it, how it may be used,
+	 * and lasting ids for its parts. Each entry is about a node, or about the
+	 * whole file when `node` is `null`. `text` is the value of a registered
+	 * text key, such as `title` or `license`, and `uuid` that of `uuid`, in
+	 * its usual text form; a program's own key, with a dot, has only its
+	 * `value`. Metadata never refuses a file: entries that break a rule are
+	 * left out, and a malformed chunk is no metadata.
+	 *
+	 * @param {{ tag: string, version: number, payload: Uint8Array }[]} chunks as `readChunks` gives them
+	 * @returns {{ node: number | null, key: string, value: Uint8Array, text: string | null, uuid: string | null }[]}
+	 *   empty when the file has no metadata
+	 * @throws {BreadError} when the file holds more than one metadata chunk,
+	 *   or not exactly one scene chunk, or its scene is refused
+	 */
+	decodeMetadata(chunks) {
+		const found = this.#atMostOne(chunks, 'META');
+		if (found === null) return [];
+		const scene = this.#theScene(chunks);
+		const meshCount = chunks.filter((chunk) => chunk.tag === 'MESH').length;
+		const x = this.#x;
+		const read = this.#withInput(found.payload, (p, pLen) =>
+			this.#withInput(scene.payload, (s, sLen) =>
+				x.bread_decode_metadata(found.version, p, pLen, scene.version, s, sLen, meshCount),
+			),
+		);
+		try {
+			if (!read) throw this.#refusal();
+			const bytes = (i, which) =>
+				new Uint8Array(
+					x.memory.buffer,
+					u32(x.bread_metadata_bytes(i, which)),
+					u32(x.bread_metadata_bytes_len(i, which)),
+				).slice();
+			const entries = [];
+			for (let i = 0, n = u32(x.bread_metadata_count()); i < n; i++) {
+				const subject = u32(x.bread_metadata_node(i));
+				const key = decoder.decode(bytes(i, 0));
+				const value = bytes(i, 1);
+				entries.push({
+					node: subject === WHOLE_FILE ? null : subject,
+					key,
+					value,
+					text: METADATA_TEXT_KEYS.includes(key) ? decoder.decode(value) : null,
+					uuid: key === 'uuid' ? uuidText(value) : null,
+				});
+			}
+			return entries;
+		} finally {
+			x.bread_release();
+		}
+	}
+
+	/** The one chunk of `tag`, or `null`; more than one refuses the file. */
+	#atMostOne(chunks, tag) {
+		const found = chunks.filter((chunk) => chunk.tag === tag);
+		if (found.length > 1) throw new BreadError('chunk-count', tag);
+		return found[0] ?? null;
+	}
+
+	/** The scene chunk, which a file holds exactly one of. */
+	#theScene(chunks) {
+		const scenes = chunks.filter((chunk) => chunk.tag === 'SCNE');
+		if (scenes.length !== 1) throw new BreadError('chunk-count', 'SCNE');
+		return scenes[0];
 	}
 
 	/** The mesh the module last decoded or read, copied out. */

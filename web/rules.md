@@ -24,14 +24,14 @@ These rules come before everything else in `web/`. Each one says why.
    never to a branch of work in progress. The viewer is still not a link but a copy: the page
    serves `viewer/dist`, built from `viewer/` on main, at `/viewer/` (`notes/viewer.md`), with the
    `NOTICE` and `LICENSE` that come in that folder.
-5. **The specification as frozen, and nothing newer.** Version 1 is frozen (tag `spec-v1`), so the
+5. **The specification as frozen, and nothing newer.** Version 2 is frozen (tag `spec-v2`), so the
    page may quote `SPEC.md` and show its layouts, such as tables of field offsets, and may offer the
-   conformance files as downloads, hosted on the page or linked from the tag `spec-v1`.
-   Only the text as of the tag `spec-v1`: a change made after it is shown once a new version of
-   the specification is tagged. Wherever the page quotes it, it says it is version 1.
-6. **No release that has not happened.** The crate is not on crates.io, the JavaScript package is
-   not on npm, and the Python reader is not on PyPI. The page does not say they are, or link to
-   them, until `facts.toml` says so.
+   conformance files as downloads, hosted on the page or linked from the tag `spec-v2`.
+   Only the text as of the tag `spec-v2`: a change made after it is shown once a new version of
+   the specification is tagged. Wherever the page quotes it, it says which version it is.
+6. **No release that has not happened.** The crate is on crates.io and the JavaScript package on
+   npm (`[project]` in `facts.toml` has their versions and links); the Python reader is not on
+   PyPI. The page names a release, or links to it, only once `facts.toml` lists it.
 7. **No number without its source.** Every number on the page comes from `facts.toml`, by its key,
    never typed into the page. A fact that a file in the repository can give has `derive`, and CI
    checks it (`check_facts.py`). A fact measured once says where in its `source`.

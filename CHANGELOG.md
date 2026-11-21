@@ -1,9 +1,33 @@
 # Changelog
 
 What changes in each release of the `bread-format` crate. The format itself is described in
-[SPEC.md](SPEC.md), version 1 since the tag `spec-v1`. Files valid by version 1 open in every
-later release. Before the freeze, a release could read files of an older release differently,
+[SPEC.md](SPEC.md): version 1 since the tag `spec-v1`, version 2 since `spec-v2`. Files valid by
+version 1 open in every later release. Before the freeze, a release could read files of an older release differently,
 and each release said how.
+
+## 0.5.0 (2026-11-21)
+
+Version 2 of the format adds chunks to version 1. Files valid by version 1 open and are written as
+in 0.4.0.
+
+- **Roles** (`ROLE`, `SPEC.md` section 11): which leaves are not models, but supports or a raft.
+  `BreadFile::roles` lists them as `RoleEntry` values, a leaf and a role (`ROLE_SUPPORTS`,
+  `ROLE_RAFT`); a leaf not listed is a model. A support leaf of a supports entry is supports
+  anyway. The reader refuses a role that names no leaf, names a leaf twice, gives a raft's role to
+  a support leaf, or gives a role to the model of a supports or hollows entry; it carries a
+  reserved role as it is, which means a model. New conformance files: `valid/roles` and four in
+  `invalid/` named `role-*`.
+- **Metadata** (`META`, `SPEC.md` section 12): who made a file, how it may be used, and lasting
+  ids for its parts. `BreadFile::metadata` lists `MetadataEntry` values: a subject (a node, or
+  `None` for the whole file), a key and a value. The registered keys are `title`, `description`,
+  `designer`, `copyright`, `license`, `source`, `created` and `generator`, as text, and `uuid`, as
+  16 bytes (`MetadataEntry::text`, `MetadataEntry::uuid`, `as_text`, `as_uuid`); a program's own
+  keys have a dot. Metadata never makes a file unreadable: the reader leaves out entries that
+  break a rule, and a malformed payload is no metadata. The writer refuses what a writer must not
+  write, and puts the chunk right after the scene chunk. New conformance files: `valid/metadata`,
+  `valid/metadata-ignored`, `valid/metadata-malformed` and `invalid/two-metadata-chunks`.
+- `BreadFile` has two new fields, `roles` and `metadata`: code that builds one field by field adds
+  them as `Vec::new()`, or ends with `..BreadFile::default()`.
 
 ## 0.4.0 (2026-11-18)
 

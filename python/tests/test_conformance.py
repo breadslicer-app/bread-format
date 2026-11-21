@@ -86,7 +86,18 @@ def file_json(bread) -> dict:
             }
             for p in bread.surface
         ],
+        "roles": [{"leaf": r.leaf, "role": r.role} for r in bread.roles],
+        "metadata": [{"subject": m.node, "key": m.key, "value": meta_value(m)} for m in bread.metadata],
     }
+
+
+def meta_value(entry):
+    if entry.uuid is not None:
+        h = entry.uuid.hex()
+        return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
+    if entry.text is not None:
+        return entry.text
+    return blob(entry.value)
 
 
 class Valid(unittest.TestCase):

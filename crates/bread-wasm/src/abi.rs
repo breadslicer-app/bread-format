@@ -23,15 +23,22 @@
 
 use std::cell::{Cell, RefCell};
 
-use bread_format::{Chunk, Mesh, Meta, Node, NodeKind, Scene, SupportPreview};
+use bread_format::{
+    Chunk, Mesh, Meta, MetadataEntry, Node, NodeKind, RoleEntry, Scene, SupportPreview,
+};
 
-use crate::{Refusal, decode_mesh_chunk, decode_previews_chunk, decode_scene_chunk, read_chunks};
+use crate::{
+    Refusal, decode_mesh_chunk, decode_metadata_chunk, decode_previews_chunk, decode_roles_chunk,
+    decode_scene_chunk, read_chunks,
+};
 
 thread_local! {
     static CHUNKS: RefCell<Vec<Chunk>> = const { RefCell::new(Vec::new()) };
     pub(crate) static MESH: RefCell<Option<Mesh>> = const { RefCell::new(None) };
     static SCENE: RefCell<Option<DecodedScene>> = const { RefCell::new(None) };
     static PREVIEWS: RefCell<Vec<SupportPreview>> = const { RefCell::new(Vec::new()) };
+    static ROLES: RefCell<Vec<RoleEntry>> = const { RefCell::new(Vec::new()) };
+    static METADATA: RefCell<Vec<MetadataEntry>> = const { RefCell::new(Vec::new()) };
     pub(crate) static REFUSAL: Cell<Option<Refusal>> = const { Cell::new(None) };
 }
 
@@ -249,6 +256,179 @@ pub extern "C" fn bread_preview_select(index: usize) -> u32 {
     u32::from(found)
 }
 
+/// A payload given to the module as a version, a pointer and a length,
+/// with version 0 for a chunk the file does not have.
+///
+/// # Safety
+///
+/// Unless `version` is 0, `ptr` points to `len` initialized bytes.
+unsafe fn optional<'a>(version: u32, ptr: *const u8, len: usize) -> Option<(u16, &'a [u8])> {
+    if version == 0 {
+        return None;
+    }
+    // SAFETY: the caller promises `len` readable bytes at `ptr`.
+    let payload = unsafe { std::slice::from_raw_parts(ptr, len) };
+    Some((u16::try_from(version).unwrap_or(u16::MAX), payload))
+}
+
+/// Decodes the role chunk payload of `version` in the `len` bytes at `ptr`,
+/// against the file's scene chunk payload of `scene_version` in the
+/// `scene_len` bytes at `scene`, over `mesh_count` mesh chunks, and its
+/// supports and hollows chunk payloads, each with version 0 when the file has
+/// none. As [`decode_roles_chunk`] does. Returns 1 when the roles were read
+/// and 0 when they were refused.
+///
+/// # Safety
+///
+/// Each pointer points to its length in initialized bytes, but for a version
+/// of 0.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn bread_decode_roles(
+    version: u32,
+    ptr: *const u8,
+    len: usize,
+    scene_version: u32,
+    scene: *const u8,
+    scene_len: usize,
+    mesh_count: usize,
+    supports_version: u32,
+    supports: *const u8,
+    supports_len: usize,
+    hollows_version: u32,
+    hollows: *const u8,
+    hollows_len: usize,
+) -> u32 {
+    // SAFETY: the caller promises each length in readable bytes at its
+    // pointer.
+    let (payload, scene_payload, supports, hollows) = unsafe {
+        (
+            std::slice::from_raw_parts(ptr, len),
+            std::slice::from_raw_parts(scene, scene_len),
+            optional(supports_version, supports, supports_len),
+            optional(hollows_version, hollows, hollows_len),
+        )
+    };
+    let version = u16::try_from(version).unwrap_or(u16::MAX);
+    let scene_version = u16::try_from(scene_version).unwrap_or(u16::MAX);
+    let decoded = decode_roles_chunk(
+        version,
+        payload,
+        scene_version,
+        scene_payload,
+        mesh_count,
+        supports,
+        hollows,
+    );
+    let (roles, refusal) = match decoded {
+        Ok(roles) => (roles, None),
+        Err(refusal) => (Vec::new(), Some(refusal)),
+    };
+    ROLES.set(roles);
+    REFUSAL.set(refusal);
+    u32::from(refusal.is_none())
+}
+
+/// How many entries the last decoded role chunk holds.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_role_count() -> usize {
+    ROLES.with_borrow(Vec::len)
+}
+
+/// The leaf of role entry `index`, as a node index.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_role_leaf(index: usize) -> usize {
+    ROLES.with_borrow(|roles| roles.get(index).map_or(0, |entry| entry.leaf))
+}
+
+/// The role of role entry `index`.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_role_value(index: usize) -> u32 {
+    ROLES.with_borrow(|roles| roles.get(index).map_or(0, |entry| u32::from(entry.role)))
+}
+
+/// Decodes the metadata chunk payload of `version` in the `len` bytes at
+/// `ptr`, against the file's scene chunk payload of `scene_version` in the
+/// `scene_len` bytes at `scene`, over `mesh_count` mesh chunks, as
+/// [`decode_metadata_chunk`] does. Returns 1 when the metadata was read and
+/// 0 when it was refused.
+///
+/// # Safety
+///
+/// Each pointer points to its length in initialized bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bread_decode_metadata(
+    version: u32,
+    ptr: *const u8,
+    len: usize,
+    scene_version: u32,
+    scene: *const u8,
+    scene_len: usize,
+    mesh_count: usize,
+) -> u32 {
+    // SAFETY: the caller promises each length in readable bytes at its
+    // pointer.
+    let (payload, scene_payload) = unsafe {
+        (
+            std::slice::from_raw_parts(ptr, len),
+            std::slice::from_raw_parts(scene, scene_len),
+        )
+    };
+    let version = u16::try_from(version).unwrap_or(u16::MAX);
+    let scene_version = u16::try_from(scene_version).unwrap_or(u16::MAX);
+    let decoded = decode_metadata_chunk(version, payload, scene_version, scene_payload, mesh_count);
+    let (metadata, refusal) = match decoded {
+        Ok(metadata) => (metadata, None),
+        Err(refusal) => (Vec::new(), Some(refusal)),
+    };
+    METADATA.set(metadata);
+    REFUSAL.set(refusal);
+    u32::from(refusal.is_none())
+}
+
+/// How many entries the last decoded metadata chunk kept.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_metadata_count() -> usize {
+    METADATA.with_borrow(Vec::len)
+}
+
+/// The node metadata entry `index` is about, or `u32::MAX` for the whole
+/// file.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_metadata_node(index: usize) -> u32 {
+    METADATA.with_borrow(|entries| {
+        entries
+            .get(index)
+            .and_then(|entry| entry.node)
+            .map_or(u32::MAX, |node| node as u32)
+    })
+}
+
+/// The key (`which` 0) or value (`which` 1) of metadata entry `index`: its
+/// address in memory.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_metadata_bytes(index: usize, which: u32) -> *const u8 {
+    METADATA.with_borrow(|entries| {
+        entries
+            .get(index)
+            .map_or(std::ptr::null(), |entry| match which {
+                0 => entry.key.as_ptr(),
+                _ => entry.value.as_ptr(),
+            })
+    })
+}
+
+/// The length in bytes of what [`bread_metadata_bytes`] gives.
+#[unsafe(no_mangle)]
+pub extern "C" fn bread_metadata_bytes_len(index: usize, which: u32) -> usize {
+    METADATA.with_borrow(|entries| {
+        entries.get(index).map_or(0, |entry| match which {
+            0 => entry.key.len(),
+            _ => entry.value.len(),
+        })
+    })
+}
+
 /// Drops every result kept, and the file being written.
 #[unsafe(no_mangle)]
 pub extern "C" fn bread_release() {
@@ -256,6 +436,8 @@ pub extern "C" fn bread_release() {
     MESH.set(None);
     SCENE.set(None);
     PREVIEWS.set(Vec::new());
+    ROLES.set(Vec::new());
+    METADATA.set(Vec::new());
     REFUSAL.set(None);
     #[cfg(feature = "write")]
     crate::write_abi::release();
