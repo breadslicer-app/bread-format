@@ -20,6 +20,8 @@
 //! application chunks, [`preview`] the meshes that show supports to readers
 //! that do not rebuild them, [`surface`] the paint on the faces of models, and
 //! [`role`] which leaves are supports or a raft rather than models.
+//! [`metadata`] says who made a file and how it may be used, and gives its
+//! parts lasting ids.
 //! [`stl`] reads STL files into meshes, to be written as `.bread`.
 
 pub mod app;
@@ -29,6 +31,7 @@ pub mod file;
 pub mod mesh;
 pub mod mesh_v2;
 mod meta;
+pub mod metadata;
 mod parallel;
 pub mod preview;
 pub mod role;
@@ -46,6 +49,8 @@ mod tests_file;
 mod tests_mesh;
 #[cfg(test)]
 mod tests_mesh_v2;
+#[cfg(test)]
+mod tests_metadata;
 #[cfg(test)]
 mod tests_preview;
 #[cfg(test)]
@@ -74,6 +79,10 @@ pub use mesh_v2::{
     Connectivity, MeshCoding, VertexCoding, decode_mesh_v2, encode_mesh_v2, encode_mesh_v2_with,
 };
 pub use meta::Meta;
+pub use metadata::{
+    EncodeMetadataError, METADATA_TAG, METADATA_VERSION, MetadataEntry, TEXT_KEYS, UUID_KEY,
+    decode_metadata, encode_metadata,
+};
 pub use preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
     SupportPreview, decode_previews, encode_previews,

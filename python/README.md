@@ -34,6 +34,7 @@ for leaf, mesh, transform in bread.placements():
 | `supports`, `hollows` | the `SUPP` and `HOLW` entries |
 | `support_previews` | each support leaf with a preview, mapped to its mesh |
 | `surface` | the `SURF` entries; `entry.values(mesh)` gives the paint of each triangle |
+| `metadata` | the `META` entries a reader keeps: each has `node` (`None` for the whole file), `key` and `value`, and `text` or `uuid` for the registered keys |
 | `roles` | the `ROLE` entries: each `leaf` that is not a model, and its `role`, `1` supports or `2` a raft (`is_known` is false for a reserved role, which means a model) |
 
 A `Mesh` keeps its vertices as the bits of their `f32` coordinates, so that every one comes back

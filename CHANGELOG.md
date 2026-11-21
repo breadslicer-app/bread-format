@@ -17,8 +17,17 @@ in 0.4.0.
   a support leaf, or gives a role to the model of a supports or hollows entry; it carries a
   reserved role as it is, which means a model. New conformance files: `valid/roles` and four in
   `invalid/` named `role-*`.
-- `BreadFile` has a new field, `roles`: code that builds one field by field adds `roles:
-  Vec::new()`, or ends with `..BreadFile::default()`.
+- **Metadata** (`META`, `SPEC.md` section 12): who made a file, how it may be used, and lasting
+  ids for its parts. `BreadFile::metadata` lists `MetadataEntry` values: a subject (a node, or
+  `None` for the whole file), a key and a value. The registered keys are `title`, `description`,
+  `designer`, `copyright`, `license`, `source`, `created` and `generator`, as text, and `uuid`, as
+  16 bytes (`MetadataEntry::text`, `MetadataEntry::uuid`, `as_text`, `as_uuid`); a program's own
+  keys have a dot. Metadata never makes a file unreadable: the reader leaves out entries that
+  break a rule, and a malformed payload is no metadata. The writer refuses what a writer must not
+  write, and puts the chunk right after the scene chunk. New conformance files: `valid/metadata`,
+  `valid/metadata-ignored`, `valid/metadata-malformed` and `invalid/two-metadata-chunks`.
+- `BreadFile` has two new fields, `roles` and `metadata`: code that builds one field by field adds
+  them as `Vec::new()`, or ends with `..BreadFile::default()`.
 
 ## 0.4.0 (2026-11-18)
 

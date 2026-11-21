@@ -4,7 +4,7 @@
  */
 
 //! A whole `.bread` file: the thumbnail when there is one, the scene chunk,
-//! the project settings, the supports, the hollows and the surface paint when
+//! the metadata when there is any, the project settings, the supports, the hollows and the surface paint when
 //! there are any, the roles of leaves that are not models, then one mesh
 //! chunk per mesh of the scene, in its order, and last the support previews
 //! when there are any.
@@ -27,6 +27,10 @@ use crate::app::{
 use crate::container::{BreadReader, BreadWriter, ChunkTag, ReadBreadError};
 use crate::mesh::{DecodeMeshError, EncodeMeshError, MESH_TAG, MESH_VERSION, Mesh, decode_mesh};
 use crate::mesh_v2::{decode_mesh_v2, encode_mesh_v2};
+use crate::metadata::{
+    EncodeMetadataError, METADATA_TAG, METADATA_VERSION, MetadataEntry, decode_metadata,
+    encode_metadata,
+};
 use crate::parallel;
 use crate::preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
@@ -78,6 +82,10 @@ pub struct BreadFile {
     /// The leaves that are not models: supports or a raft. A support leaf of
     /// `supports` is supports whether it is listed here or not.
     pub roles: Vec<RoleEntry>,
+    /// Who made the file, how it may be used, and lasting ids for its parts.
+    /// Reading leaves out what breaks a rule of section 12, so metadata never
+    /// makes a file unreadable.
+    pub metadata: Vec<MetadataEntry>,
 }
 
 /// Why a file could not be written.
@@ -96,6 +104,7 @@ pub enum WriteFileError {
     RoleConflict {
         leaf: usize,
     },
+    Metadata(EncodeMetadataError),
     /// A support leaf shows a mesh with vertices or triangles: support
     /// leaves are stored with an empty mesh.
     SupportMeshNotEmpty {
@@ -122,6 +131,7 @@ impl fmt::Display for WriteFileError {
             Self::Surface(err) => write!(f, "{err}"),
             Self::Roles(err) => write!(f, "{err}"),
             Self::RoleConflict { leaf } => write!(f, "{}", RoleConflict(*leaf)),
+            Self::Metadata(err) => write!(f, "{err}"),
             Self::SupportMeshNotEmpty { leaf } => {
                 write!(
                     f,
@@ -269,6 +279,7 @@ pub fn supported_version(tag: ChunkTag) -> Option<u16> {
         SUPPORT_PREVIEW_TAG => SUPPORT_PREVIEW_VERSION,
         SURFACE_TAG => SURFACE_VERSION,
         ROLE_TAG => ROLE_VERSION,
+        METADATA_TAG => METADATA_VERSION,
         _ => return None,
     })
 }
@@ -284,6 +295,7 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
         encode_previews(&file.support_previews, scene).map_err(WriteFileError::Previews)?;
     let surface = encode_surface(&file.surface, scene).map_err(WriteFileError::Surface)?;
     let roles = encode_roles(&file.roles, scene).map_err(WriteFileError::Roles)?;
+    let metadata = encode_metadata(&file.metadata, scene).map_err(WriteFileError::Metadata)?;
     for entry in &file.supports {
         let leaf = entry.support;
         if scene
@@ -313,6 +325,9 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
         writer.chunk(THUMBNAIL_TAG, THUMBNAIL_VERSION, thumbnail)?;
     }
     writer.chunk(SCENE_TAG, SCENE_VERSION, &scene_payload)?;
+    if !file.metadata.is_empty() {
+        writer.chunk(METADATA_TAG, METADATA_VERSION, &metadata)?;
+    }
     if let Some(settings) = &file.settings {
         writer.chunk(SETTINGS_TAG, SETTINGS_VERSION, settings)?;
     }
@@ -387,7 +402,7 @@ fn read_chunks<'scope, R: Read>(
         Vec::new(),
         Vec::new(),
     );
-    let (mut surfaces, mut roles) = (Vec::new(), Vec::new());
+    let (mut surfaces, mut roles, mut metadata) = (Vec::new(), Vec::new(), Vec::new());
     let mut pending: Vec<PendingMesh<'scope>> = Vec::new();
     let mut running = std::collections::VecDeque::new();
     let threads = parallel::threads();
@@ -414,6 +429,7 @@ fn read_chunks<'scope, R: Read>(
                 SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
                 SURFACE_TAG => surfaces.push(chunk.payload),
                 ROLE_TAG => roles.push(chunk.payload),
+                METADATA_TAG => metadata.push(chunk.payload),
                 _ => {
                     let (version, payload) = (chunk.version, chunk.payload);
                     if threads < 2 || payload.len() < MESH_ON_ITS_OWN_THREAD {
@@ -460,6 +476,7 @@ fn read_chunks<'scope, R: Read>(
     let previews = single(SUPPORT_PREVIEW_TAG, previews)?;
     let surface = single(SURFACE_TAG, surfaces)?;
     let roles = single(ROLE_TAG, roles)?;
+    let metadata = single(METADATA_TAG, metadata)?;
 
     let scene = decode_scene(&scene, meshes).map_err(ReadFileError::Scene)?;
     let supports = match supports {
@@ -493,6 +510,7 @@ fn read_chunks<'scope, R: Read>(
     if let Some(leaf) = role_conflict(&roles, &supports, &hollows) {
         return Err(ReadFileError::RoleConflict { leaf });
     }
+    let metadata = metadata.map_or_else(Vec::new, |payload| decode_metadata(&payload, &scene));
     Ok(BreadFile {
         scene,
         settings,
@@ -502,6 +520,7 @@ fn read_chunks<'scope, R: Read>(
         support_previews,
         surface,
         roles,
+        metadata,
     })
 }
 
