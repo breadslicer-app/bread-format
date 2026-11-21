@@ -1,0 +1,399 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: ui/app.slint:91
+msgctxt "Row"
+msgid "Already there: {}"
+msgstr "Ya existe: {}"
+
+#: ui/app.slint:92
+msgctxt "Row"
+msgid "Not converted this way"
+msgstr "No se convierte en este sentido"
+
+#: ui/app.slint:93
+msgctxt "Row"
+msgid "→ {}"
+msgstr "→ {}"
+
+#: ui/app.slint:124
+msgctxt "Row"
+msgid "Waiting"
+msgstr "En espera"
+
+#: ui/app.slint:125
+msgctxt "Row"
+msgid "Converting…"
+msgstr "Convirtiendo…"
+
+#: ui/app.slint:126
+msgctxt "Row"
+msgid "Converted"
+msgstr "Convertido"
+
+#: ui/app.slint:126
+msgctxt "Row"
+msgid "Checked"
+msgstr "Verificado"
+
+#: ui/app.slint:127
+msgctxt "Row"
+msgid "Skipped"
+msgstr "Salteado"
+
+#: ui/app.slint:128
+msgctxt "Row"
+msgid "Ready"
+msgstr "Listo"
+
+#: ui/app.slint:128
+msgctxt "Row"
+msgid "Failed"
+msgstr "Falló"
+
+#: ui/app.slint:199
+msgctxt "AppWindow"
+msgid "{n} file"
+msgid_plural "{n} files"
+msgstr[0] "{n} archivo"
+msgstr[1] "{n} archivos"
+
+#: ui/app.slint:200
+msgctxt "AppWindow"
+msgid "{} converted, {} skipped, {} failed"
+msgstr "{} convertidos, {} salteados, {} con error"
+
+#: ui/app.slint:201
+msgctxt "AppWindow"
+msgid "Nothing to add there: no STL or .bread files."
+msgstr "No hay nada para agregar ahí: ni STL ni .bread."
+
+#: ui/app.slint:202
+msgctxt "AppWindow"
+msgid "Choose the folder to write into."
+msgstr "Elegí la carpeta donde escribir."
+
+#: ui/app.slint:203
+msgctxt "AppWindow"
+msgid "Converting {} of {}: {} of {}, {}"
+msgstr "Convirtiendo {} de {}: {} de {}, {}"
+
+#: ui/app.slint:204
+msgctxt "AppWindow"
+msgid "Done in {}: {}"
+msgstr "Listo en {}: {}"
+
+#: ui/app.slint:205
+msgctxt "AppWindow"
+msgid "Stopped after {}: {}"
+msgstr "Detenido a los {}: {}"
+
+#: ui/app.slint:206
+msgctxt "AppWindow"
+msgid "Converted in {}, nothing written: {} would take {}, {} more."
+msgstr "Convertido en {}, sin escribir nada: {} ocuparían {}, {} más."
+
+#: ui/app.slint:207
+msgctxt "AppWindow"
+msgid "Converted in {}, nothing written: {} would take {}, {} less."
+msgstr "Convertido en {}, sin escribir nada: {} ocuparían {}, {} menos."
+
+#: ui/app.slint:208
+msgctxt "AppWindow"
+msgid "Add STL or .bread files to convert."
+msgstr "Agregá archivos STL o .bread para convertir."
+
+#: ui/app.slint:209
+msgctxt "AppWindow"
+msgid "{}, {}"
+msgstr "{}, {}"
+
+#: ui/app.slint:279 ui/app.slint:819
+msgctxt "AppWindow"
+msgid "STL and .bread, both ways, without losing a bit"
+msgstr "STL y .bread, en los dos sentidos, sin perder un bit"
+
+#: ui/app.slint:302
+msgctxt "AppWindow"
+msgid "About"
+msgstr "Acerca de"
+
+#: ui/app.slint:310
+msgctxt "AppWindow"
+msgid "Minimize"
+msgstr "Minimizar"
+
+#: ui/app.slint:317
+msgctxt "AppWindow"
+msgid "Restore"
+msgstr "Restaurar"
+
+#: ui/app.slint:317
+msgctxt "AppWindow"
+msgid "Maximize"
+msgstr "Maximizar"
+
+#: ui/app.slint:324 ui/app.slint:820
+msgctxt "AppWindow"
+msgid "Close"
+msgstr "Cerrar"
+
+#: ui/app.slint:360
+msgctxt "AppWindow"
+msgid "ADD"
+msgstr "AGREGAR"
+
+#: ui/app.slint:366
+msgctxt "AppWindow"
+msgid "Files…"
+msgstr "Archivos…"
+
+#: ui/app.slint:375
+msgctxt "AppWindow"
+msgid "Folder…"
+msgstr "Carpeta…"
+
+#: ui/app.slint:384
+msgctxt "AppWindow"
+msgid "Look inside subfolders"
+msgstr "Buscar también en subcarpetas"
+
+#: ui/app.slint:391
+msgctxt "AppWindow"
+msgid "Or drop files and folders on the list."
+msgstr "O soltá archivos y carpetas sobre la lista."
+
+#: ui/app.slint:396
+msgctxt "AppWindow"
+msgid "CONVERT"
+msgstr "CONVERTIR"
+
+#: ui/app.slint:399
+msgctxt "AppWindow"
+msgid "Both ways"
+msgstr "Los dos"
+
+#: ui/app.slint:399
+msgctxt "AppWindow"
+msgid "STL → .bread"
+msgstr "STL → .bread"
+
+#: ui/app.slint:399
+msgctxt "AppWindow"
+msgid ".bread → STL"
+msgstr ".bread → STL"
+
+#: ui/app.slint:409
+msgctxt "AppWindow"
+msgid "Each file by its extension: STL to .bread, .bread to STL."
+msgstr "Cada archivo según su extensión: STL a .bread, .bread a STL."
+
+#: ui/app.slint:411
+msgctxt "AppWindow"
+msgid ""
+"STL files only, binary or ASCII. Each .bread file is read back and checked "
+"bit for bit before it is written."
+msgstr "Solo archivos STL, binarios o ASCII. Cada .bread se vuelve a leer y se verifica bit a bit antes de escribirlo."
+
+#: ui/app.slint:412
+msgctxt "AppWindow"
+msgid ""
+".bread files only. Everything each file shows goes into one STL, in place."
+msgstr "Solo archivos .bread. Todo lo que muestra cada uno va a un STL, en su lugar."
+
+#: ui/app.slint:417
+msgctxt "AppWindow"
+msgid "EXPORT"
+msgstr "EXPORTAR"
+
+#: ui/app.slint:420
+msgctxt "AppWindow"
+msgid "Convert and export"
+msgstr "Convertir y exportar"
+
+#: ui/app.slint:420
+msgctxt "AppWindow"
+msgid "Convert only"
+msgstr "Solo convertir"
+
+#: ui/app.slint:430
+msgctxt "AppWindow"
+msgid "Each file is written as soon as it is converted."
+msgstr "Cada archivo se escribe apenas se convierte."
+
+#: ui/app.slint:431
+msgctxt "AppWindow"
+msgid ""
+"Nothing is written yet: see how much room they would take, then export them "
+"as set below."
+msgstr "Todavía no se escribe nada: mirá cuánto lugar ocuparían y después exportalos como se elija abajo."
+
+#: ui/app.slint:436
+msgctxt "AppWindow"
+msgid "WRITE"
+msgstr "ESCRIBIR"
+
+#: ui/app.slint:439
+msgctxt "AppWindow"
+msgid "Next to each file"
+msgstr "Al lado de cada uno"
+
+#: ui/app.slint:439
+msgctxt "AppWindow"
+msgid "Into a folder"
+msgstr "En una carpeta"
+
+#: ui/app.slint:451
+msgctxt "AppWindow"
+msgid "Choose a folder"
+msgstr "Elegí una carpeta"
+
+#: ui/app.slint:468
+msgctxt "AppWindow"
+msgid "Keep the subfolders"
+msgstr "Mantener las subcarpetas"
+
+#: ui/app.slint:477
+msgctxt "AppWindow"
+msgid "IF THE FILE IS THERE"
+msgstr "SI EL ARCHIVO YA EXISTE"
+
+#: ui/app.slint:480
+msgctxt "AppWindow"
+msgid "Skip"
+msgstr "Saltear"
+
+#: ui/app.slint:480
+msgctxt "AppWindow"
+msgid "Replace"
+msgstr "Reemplazar"
+
+#: ui/app.slint:480
+msgctxt "AppWindow"
+msgid "Keep both"
+msgstr "Dejar los dos"
+
+#: ui/app.slint:519
+msgctxt "AppWindow"
+msgid "FILE"
+msgstr "ARCHIVO"
+
+#: ui/app.slint:524
+msgctxt "AppWindow"
+msgid "WAY"
+msgstr "SENTIDO"
+
+#: ui/app.slint:528
+msgctxt "AppWindow"
+msgid "SIZE"
+msgstr "TAMAÑO"
+
+#: ui/app.slint:533
+msgctxt "AppWindow"
+msgid "RESULT"
+msgstr "RESULTADO"
+
+#: ui/app.slint:543
+msgctxt "AppWindow"
+msgid "STATE"
+msgstr "ESTADO"
+
+#: ui/app.slint:564
+msgctxt "AppWindow"
+msgid "Drop STL and .bread files or folders here"
+msgstr "Soltá acá archivos STL y .bread, o carpetas"
+
+#: ui/app.slint:570
+msgctxt "AppWindow"
+msgid "or add them with Files… and Folder…"
+msgstr "o agregalos con Archivos… y Carpeta…"
+
+#: ui/app.slint:602
+msgctxt "AppWindow"
+msgid "converted"
+msgstr "convertidos"
+
+#: ui/app.slint:606
+msgctxt "AppWindow"
+msgid "time"
+msgstr "tiempo"
+
+#: ui/app.slint:610
+msgctxt "AppWindow"
+msgid "before"
+msgstr "antes"
+
+#: ui/app.slint:614
+msgctxt "AppWindow"
+msgid "would take"
+msgstr "ocuparían"
+
+#: ui/app.slint:614
+msgctxt "AppWindow"
+msgid "after"
+msgstr "después"
+
+#: ui/app.slint:618
+msgctxt "AppWindow"
+msgid "more"
+msgstr "más"
+
+#: ui/app.slint:618
+msgctxt "AppWindow"
+msgid "saved"
+msgstr "ahorrado"
+
+#: ui/app.slint:622
+msgctxt "AppWindow"
+msgid "free where it would go"
+msgstr "libre donde irían"
+
+#: ui/app.slint:626
+msgctxt "AppWindow"
+msgid ""
+"There is not enough room there for them: export them somewhere else, or skip "
+"some."
+msgstr "No hay lugar suficiente ahí: exportalos a otro lado, o dejá algunos afuera."
+
+#: ui/app.slint:651
+msgctxt "AppWindow"
+msgid "Drop to add"
+msgstr "Soltá para agregar"
+
+#: ui/app.slint:697
+msgctxt "AppWindow"
+msgid "Open folder"
+msgstr "Abrir carpeta"
+
+#: ui/app.slint:709
+msgctxt "AppWindow"
+msgid "Clear"
+msgstr "Vaciar"
+
+#: ui/app.slint:721
+msgctxt "AppWindow"
+msgid "Stop"
+msgstr "Detener"
+
+#: ui/app.slint:733
+msgctxt "AppWindow"
+msgid "Export"
+msgstr "Exportar"
+
+#: ui/app.slint:747
+msgctxt "AppWindow"
+msgid "Convert"
+msgstr "Convertir"
+
+#: ui/app.slint:827
+msgctxt "AppWindow"
+msgid ""
+"Part of bread-format, the open .bread format: tiny, lossless meshes and "
+"scenes. Apache-2.0. It carries meshoptimizer (MIT) and Zstandard (BSD), and "
+"the Noto Sans font (SIL OFL 1.1). Its window is drawn with Slint."
+msgstr "Parte de bread-format, el formato abierto .bread: mallas y escenas chiquitas y sin pérdida. Apache-2.0. Incluye meshoptimizer (MIT) y Zstandard (BSD), y la fuente Noto Sans (SIL OFL 1.1). Su ventana está hecha con Slint."
