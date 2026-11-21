@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-11-21, the crate's version on crates.io
+
+- New fact, `[project] crate_version`: 0.4.0, the newest release of the crate on crates.io, for
+  the Cargo.toml snippet and the packages row. `version` stays the newest tag, 0.5.0.
+
 ## 2026-11-21, release 0.5.0 and the specification's version 2
 
 - `[project]`: the reference implementation is 0.5.0 (tag `v0.5.0`), with 0.4.0 among the earlier
