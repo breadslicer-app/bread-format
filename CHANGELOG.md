@@ -5,6 +5,21 @@ What changes in each release of the `bread-format` crate. The format itself is d
 later release. Before the freeze, a release could read files of an older release differently,
 and each release said how.
 
+## 0.5.0 (unreleased)
+
+Version 2 of the format adds chunks to version 1. Files valid by version 1 open and are written as
+in 0.4.0.
+
+- **Roles** (`ROLE`, `SPEC.md` section 11): which leaves are not models, but supports or a raft.
+  `BreadFile::roles` lists them as `RoleEntry` values, a leaf and a role (`ROLE_SUPPORTS`,
+  `ROLE_RAFT`); a leaf not listed is a model. A support leaf of a supports entry is supports
+  anyway. The reader refuses a role that names no leaf, names a leaf twice, gives a raft's role to
+  a support leaf, or gives a role to the model of a supports or hollows entry; it carries a
+  reserved role as it is, which means a model. New conformance files: `valid/roles` and four in
+  `invalid/` named `role-*`.
+- `BreadFile` has a new field, `roles`: code that builds one field by field adds `roles:
+  Vec::new()`, or ends with `..BreadFile::default()`.
+
 ## 0.4.0 (2026-11-18)
 
 The first release on crates.io. Files open and are written exactly as in 0.3.0, except for the
