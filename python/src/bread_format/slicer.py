@@ -106,6 +106,26 @@ def read_paint(payload: bytes) -> list[Paint]:
     return entries
 
 
+@dataclass(frozen=True)
+class Role:
+    """A ROLE entry: a leaf that is not a model (SPEC 11)."""
+
+    leaf: int
+    role: int  # 1 supports, 2 a raft; other values are reserved and mean a model
+
+    @property
+    def is_known(self) -> bool:
+        return self.role in (1, 2)
+
+
+def read_roles(payload: bytes) -> list[Role]:
+    """The entries of a ROLE payload of version 1."""
+    f = Fields(payload)
+    entries = [Role(f.u32(), f.u8()) for _ in range(f.count(5))]
+    f.end()
+    return entries
+
+
 def fingerprint_of(mesh) -> bytes:
     """The SHA-384 digest that names a mesh (SPEC 10.1)."""
     digest = hashlib.sha384()

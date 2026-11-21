@@ -25,10 +25,10 @@ use std::path::{Path, PathBuf};
 
 use bread_format::{
     BreadFile, BreadReader, BreadWriter, ChunkTag, Connectivity, DecodeMeshError, DecodeSceneError,
-    HollowEntry, MESH_TAG, Mesh, MeshCoding, Meta, Node, NodeKind, ReadBreadError, ReadFileError,
-    SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportEntry, SupportPreview, SurfaceEntry,
-    THUMBNAIL_TAG, Transform, VertexCoding, encode_mesh, encode_mesh_v2_with, read_file,
-    write_file,
+    HollowEntry, MESH_TAG, Mesh, MeshCoding, Meta, Node, NodeKind, ROLE_RAFT, ROLE_SUPPORTS,
+    ROLE_TAG, ReadBreadError, ReadFileError, RoleEntry, SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene,
+    SupportEntry, SupportPreview, SurfaceEntry, THUMBNAIL_TAG, Transform, VertexCoding,
+    encode_mesh, encode_mesh_v2_with, read_file, write_file,
 };
 use sha2::{Digest, Sha256, Sha384};
 
@@ -143,6 +143,16 @@ const CASES: &[Case] = &[
                       supports kept off two triangles at half strength. Each mask names the cube \
                       by its fingerprint.",
         file: surface_paint,
+        skipped: &[],
+        meshes: Writing::Auto,
+    },
+    Case {
+        name: "roles",
+        description: "A triangle on supports kept as data, beside supports made by another \
+                      program and a raft, both kept as meshes. The role chunk names the posts \
+                      leaf as supports and the plate leaf as a raft; the triangle is a model, \
+                      and the supports leaf shows supports because a supports entry names it.",
+        file: roles,
         skipped: &[],
         meshes: Writing::Auto,
     },
@@ -458,6 +468,54 @@ fn slicer_data() -> BreadFile {
         thumbnail: None,
         support_previews: Vec::new(),
         surface: Vec::new(),
+        roles: Vec::new(),
+    }
+}
+
+/// A triangle on supports kept as data, and two leaves that are not models
+/// but whose meshes are kept: supports from another program and a raft. Their
+/// names say nothing; the role chunk does.
+fn roles() -> BreadFile {
+    let empty = Mesh {
+        meta: None,
+        vertices: Vec::new(),
+        triangles: Vec::new(),
+    };
+    BreadFile {
+        scene: Scene {
+            meshes: vec![
+                triangle_mesh([0, 1, 2]),
+                empty,
+                cube_mesh("imported"),
+                cube_mesh("plate"),
+            ],
+            nodes: vec![
+                leaf(named("model"), None, 0),
+                leaf(named("supports"), None, 1),
+                leaf(named("posts"), None, 2),
+                leaf(named("plate"), None, 3),
+            ],
+            roots: vec![0, 1, 2, 3],
+            ..Scene::default()
+        },
+        supports: vec![SupportEntry {
+            model: 0,
+            support: 1,
+            generator: "example".into(),
+            version: 1,
+            document: b"supports document".to_vec(),
+        }],
+        roles: vec![
+            RoleEntry {
+                leaf: 2,
+                role: ROLE_SUPPORTS,
+            },
+            RoleEntry {
+                leaf: 3,
+                role: ROLE_RAFT,
+            },
+        ],
+        ..BreadFile::default()
     }
 }
 
@@ -766,6 +824,12 @@ fn describe(description: &str, file: &BreadFile) -> String {
             ("mesh", mesh(&preview.mesh)),
         ])
     });
+    let roles = file.roles.iter().map(|entry| {
+        Json::Object(vec![
+            ("leaf", Json::index(entry.leaf)),
+            ("role", Json::int(u32::from(entry.role))),
+        ])
+    });
     let surface = file.surface.iter().map(|entry| {
         Json::Object(vec![
             ("leaf", Json::index(entry.leaf)),
@@ -792,6 +856,7 @@ fn describe(description: &str, file: &BreadFile) -> String {
         ("thumbnail", payload(file.thumbnail.as_deref())),
         ("support_previews", Json::List(previews.collect())),
         ("surface", Json::List(surface.collect())),
+        ("roles", Json::List(roles.collect())),
     ]);
     let mut out = String::new();
     json.write(&mut out, 0);
@@ -1098,6 +1163,38 @@ const INVALID: &[Invalid] = &[
         reason: "malformed",
         chunk: Some(MESH_TAG),
         bytes: mesh_rans_too_many_vertices,
+    },
+    Invalid {
+        name: "role-no-such-leaf",
+        description: "The roles file with its raft entry naming node 9, which the scene does not \
+                      have.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_no_such_leaf,
+    },
+    Invalid {
+        name: "role-same-leaf",
+        description: "The roles file with both entries naming the posts leaf, one as supports and \
+                      one as a raft.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_same_leaf,
+    },
+    Invalid {
+        name: "role-raft-on-supports",
+        description: "The roles file with its raft entry naming the supports leaf, which a \
+                      supports entry already names as supports.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_raft_on_supports,
+    },
+    Invalid {
+        name: "role-on-a-model",
+        description: "The roles file with its raft entry naming the triangle, the model of a \
+                      supports entry.",
+        reason: "malformed",
+        chunk: Some(ROLE_TAG),
+        bytes: role_on_a_model,
     },
 ];
 
@@ -1483,6 +1580,42 @@ fn huge_vertex_count() -> Vec<u8> {
     file_of(&chunks)
 }
 
+/// The roles file with its role payload replaced by `entries`, each a leaf
+/// and a role.
+fn roles_with(entries: &[(u32, u8)]) -> Vec<u8> {
+    let bytes = write_file(&roles(), Vec::new()).expect("the roles case writes");
+    let mut reader = BreadReader::new(bytes.as_slice()).expect("the header reads");
+    let mut chunks = Vec::new();
+    while let Some(chunk) = reader.next_chunk().expect("the chunk reads") {
+        let mut payload = chunk.payload;
+        if chunk.tag == ROLE_TAG {
+            payload = (entries.len() as u32).to_le_bytes().to_vec();
+            for &(leaf, role) in entries {
+                payload.extend(leaf.to_le_bytes());
+                payload.push(role);
+            }
+        }
+        chunks.push((chunk.tag, chunk.version, payload));
+    }
+    file_of(&chunks)
+}
+
+fn role_no_such_leaf() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (9, ROLE_RAFT)])
+}
+
+fn role_same_leaf() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (2, ROLE_RAFT)])
+}
+
+fn role_raft_on_supports() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (1, ROLE_RAFT)])
+}
+
+fn role_on_a_model() -> Vec<u8> {
+    roles_with(&[(2, ROLE_SUPPORTS), (0, ROLE_RAFT)])
+}
+
 /// The reason code of `err`, and the chunk it is about, as the README names
 /// them.
 fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
@@ -1499,6 +1632,9 @@ fn reason(err: &ReadFileError) -> (&'static str, Option<ChunkTag>) {
             ("no-such-vertex", Some(MESH_TAG))
         }
         ReadFileError::Scene(DecodeSceneError::Malformed) => ("malformed", Some(SCENE_TAG)),
+        ReadFileError::Roles(_) | ReadFileError::RoleConflict { .. } => {
+            ("malformed", Some(ROLE_TAG))
+        }
         other => panic!("no conformance file expects this error: {other}"),
     }
 }

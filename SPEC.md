@@ -1,7 +1,8 @@
 # The `.bread` file format
 
-**Status:** version 1, frozen (tag `spec-v1`). From here on, what this document describes changes only
-through new versions ([3.6](#36-stability)).
+**Status:** version 2, in progress: it adds chunks to version 1 and changes nothing version 1
+describes. Version 1 is frozen (tag `spec-v1`); version 2 is tagged `spec-v2` once it is complete
+([3.6](#36-stability)).
 
 ## 1. Introduction
 
@@ -123,11 +124,13 @@ plate is up to the program that prints it.
 
 ### 3.6 Stability
 
-This is version 1 of this document. Every layout it describes is fixed: the container's, and each
-chunk version's in the [chunk registry](#71-official-chunks). A change to one is made as a new
-version of it ([Versions](#34-versions)), or as a new chunk, never by editing the version described
-here. A new version of this document may add chunks and versions, and may say more where this text
-is unclear, but a file that is valid by this document stays valid, and means the same.
+This is version 2 of this document. Version 1, frozen at the tag `spec-v1`, describes the container
+and the chunks up to `SURF`; version 2 adds the role chunk ([11](#11-roles-role)) and changes
+nothing else. Every layout described here is fixed: the container's, and each chunk version's in the
+[chunk registry](#71-official-chunks). A change to one is made as a new version of it
+([Versions](#34-versions)), or as a new chunk, never by editing the version described here. A new
+version of this document may add chunks and versions, and may say more where this text is unclear,
+but a file that is valid by an earlier version stays valid, and means the same.
 
 A reader that supports a later version of the container or of a chunk SHOULD keep reading the
 versions described here, so that a file written today keeps opening. For `MESH` this is a
@@ -135,8 +138,10 @@ requirement: a reader that reads it MUST read versions 1 and 2 ([6.6](#66-versio
 exception is version 1 of `SUPP` and `HOLW`, written only while this document was a draft, which a
 reader MAY skip ([7.3](#73-application-chunks)).
 
-The conformance files in `conformance/` belong to this version: a reader of version 1 reads each
-valid file as its description says, and refuses each invalid one for its reason.
+The conformance files in `conformance/` belong to this version: a reader of version 2 reads each
+valid file as its description says, and refuses each invalid one for its reason. A reader of
+version 1 skips the chunks version 2 adds, so the invalid files that are invalid only because of
+one of them are not invalid to it.
 
 ## 4. Container
 
@@ -656,6 +661,7 @@ file](#44-reading-a-file)).
 | `HOLW` | 2 | at most one | application data: hollowed models | [7.3](#73-application-chunks) |
 | `SPRV` | 1 | at most one | a preview of the supports, for readers that skip `SUPP` | [9](#9-support-preview-sprv) |
 | `SURF` | 1 | at most one | paint on the faces of models | [10](#10-surface-paint-surf) |
+| `ROLE` | 1 | at most one | what each leaf is: a model, supports or a raft | [11](#11-roles-role) |
 
 *Version* is the chunk version this document describes. A reader that reads a tag MUST refuse a file
 that holds a different number of chunks of that tag than *Per file* allows.
@@ -909,3 +915,50 @@ A program that changes a leaf's mesh and writes the file back SHOULD repaint it,
 Leaving it is harmless, since the fingerprint no longer matches, but it takes room for nothing.
 
 A reader that skips `SURF` reads the same scene, without the paint.
+
+## 11. Roles (`ROLE`)
+
+A scene's leaves are not all models: some show supports, and some a raft that several models stand
+on. A slicer treats them apart, for example when it makes models a little larger to make up for
+shrinking and leaves supports as they are. The role chunk says which leaves are not models. It is
+optional: a leaf it does not name is a model, so a file of models alone needs none. This section
+describes chunk version 1.
+
+A support leaf of a [`SUPP`](#supp-supports) entry is a support whether this chunk names it or not.
+The role chunk is for the other leaves that are not models: supports kept as a mesh, such as ones
+made by another program, and rafts.
+
+### 11.1 Layout
+
+| Field | Type | Meaning |
+|---|---|---|
+| entries | count | how many entries follow |
+| leaf | `u32` | the node index of a leaf in the scene chunk ([5](#5-scene-scne)) |
+| role | `u8` | what the leaf is: `1` supports, `2` a raft |
+
+The last two fields repeat for every entry, so each entry takes 5 bytes. Roles 0 and 3 to 255 are
+reserved.
+
+A writer:
+
+- MUST name leaves only, and MUST NOT write two entries with the same leaf;
+- MUST NOT write a reserved role;
+- MUST NOT give the role of a raft to a support leaf of a `SUPP` entry, and MUST NOT give a role to
+  the model of a `SUPP` or [`HOLW`](#holw-hollowed-models) entry, which is a model;
+- MAY name a support leaf of a `SUPP` entry with the role of supports, which it has anyway;
+- SHOULD write the entries in increasing order of leaf, and the chunk after the surface paint chunk
+  and before the `MESH` chunks.
+
+### 11.2 Reading it
+
+A reader that reads `ROLE`:
+
+- MUST refuse the file if an entry names no node of the scene or a node that is not a leaf, or if two
+  entries name the same leaf;
+- MUST refuse the file if an entry gives the role of a raft to a support leaf of a `SUPP` entry, or
+  gives the role of supports or of a raft to the model of a `SUPP` or `HOLW` entry;
+- MUST NOT refuse the file for a reserved role. It SHOULD treat such an entry as absent, so the leaf
+  is a model to it.
+
+A reader that reads `SUPP` but not `ROLE` knows the support leaves of `SUPP` entries, and takes every
+other leaf for a model. A reader that skips both takes every leaf for a model.

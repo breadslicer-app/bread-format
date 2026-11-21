@@ -86,6 +86,7 @@ def file_json(bread) -> dict:
             }
             for p in bread.surface
         ],
+        "roles": [{"leaf": r.leaf, "role": r.role} for r in bread.roles],
     }
 
 

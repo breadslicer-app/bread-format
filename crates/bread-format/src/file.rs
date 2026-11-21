@@ -5,8 +5,9 @@
 
 //! A whole `.bread` file: the thumbnail when there is one, the scene chunk,
 //! the project settings, the supports, the hollows and the surface paint when
-//! there are any, then one mesh chunk per mesh of the scene, in its order, and
-//! last the support previews when there are any.
+//! there are any, the roles of leaves that are not models, then one mesh
+//! chunk per mesh of the scene, in its order, and last the support previews
+//! when there are any.
 //!
 //! Reading skips the chunks this build does not know, official or private,
 //! and writing leaves them out, as section 7.2 allows. It also skips supports
@@ -30,6 +31,10 @@ use crate::parallel;
 use crate::preview::{
     DecodePreviewsError, EncodePreviewsError, SUPPORT_PREVIEW_TAG, SUPPORT_PREVIEW_VERSION,
     SupportPreview, decode_previews, encode_previews,
+};
+use crate::role::{
+    DecodeRolesError, EncodeRolesError, ROLE_RAFT, ROLE_TAG, ROLE_VERSION, RoleEntry, decode_roles,
+    encode_roles,
 };
 use crate::scene::{
     DecodeSceneError, EncodeSceneError, SCENE_TAG, SCENE_VERSION, Scene, decode_scene, encode_scene,
@@ -70,6 +75,9 @@ pub struct BreadFile {
     /// What was painted on the faces of leaves: one mask per leaf and kind,
     /// each document carried without being read.
     pub surface: Vec<SurfaceEntry>,
+    /// The leaves that are not models: supports or a raft. A support leaf of
+    /// `supports` is supports whether it is listed here or not.
+    pub roles: Vec<RoleEntry>,
 }
 
 /// Why a file could not be written.
@@ -82,6 +90,12 @@ pub enum WriteFileError {
     Hollows(EncodeDocumentsError),
     Previews(EncodePreviewsError),
     Surface(EncodeSurfaceError),
+    Roles(EncodeRolesError),
+    /// A role contradicts the supports or hollows: a support leaf given the
+    /// role of a raft, or a model of either given a role.
+    RoleConflict {
+        leaf: usize,
+    },
     /// A support leaf shows a mesh with vertices or triangles: support
     /// leaves are stored with an empty mesh.
     SupportMeshNotEmpty {
@@ -106,6 +120,8 @@ impl fmt::Display for WriteFileError {
             Self::Supports(err) | Self::Hollows(err) => write!(f, "{err}"),
             Self::Previews(err) => write!(f, "{err}"),
             Self::Surface(err) => write!(f, "{err}"),
+            Self::Roles(err) => write!(f, "{err}"),
+            Self::RoleConflict { leaf } => write!(f, "{}", RoleConflict(*leaf)),
             Self::SupportMeshNotEmpty { leaf } => {
                 write!(
                     f,
@@ -150,6 +166,12 @@ pub enum ReadFileError {
     Hollows(DecodeDocumentsError),
     Previews(DecodePreviewsError),
     Surface(DecodeSurfaceError),
+    Roles(DecodeRolesError),
+    /// A role contradicts the supports or hollows: a support leaf given the
+    /// role of a raft, or a model of either given a role.
+    RoleConflict {
+        leaf: usize,
+    },
     /// A support leaf is also a hollowed model.
     SupportIsHollowed {
         leaf: usize,
@@ -179,6 +201,8 @@ impl fmt::Display for ReadFileError {
             Self::Supports(err) | Self::Hollows(err) => write!(f, "{err}"),
             Self::Previews(err) => write!(f, "{err}"),
             Self::Surface(err) => write!(f, "{err}"),
+            Self::Roles(err) => write!(f, "{err}"),
+            Self::RoleConflict { leaf } => write!(f, "{}", RoleConflict(*leaf)),
             Self::SupportIsHollowed { leaf } => write!(f, "{}", SupportIsHollowed(*leaf)),
             Self::PreviewWithoutSupports { leaf } => {
                 write!(f, "{}", PreviewWithoutSupports(*leaf))
@@ -188,6 +212,19 @@ impl fmt::Display for ReadFileError {
 }
 
 impl std::error::Error for ReadFileError {}
+
+/// The message of both `RoleConflict` errors.
+struct RoleConflict(usize);
+
+impl fmt::Display for RoleConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the role of leaf {} contradicts the supports or hollows",
+            self.0
+        )
+    }
+}
 
 /// The message of both `SupportIsHollowed` errors.
 struct SupportIsHollowed(usize);
@@ -231,6 +268,7 @@ pub fn supported_version(tag: ChunkTag) -> Option<u16> {
         MESH_TAG => MESH_VERSION,
         SUPPORT_PREVIEW_TAG => SUPPORT_PREVIEW_VERSION,
         SURFACE_TAG => SURFACE_VERSION,
+        ROLE_TAG => ROLE_VERSION,
         _ => return None,
     })
 }
@@ -245,6 +283,7 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     let previews =
         encode_previews(&file.support_previews, scene).map_err(WriteFileError::Previews)?;
     let surface = encode_surface(&file.surface, scene).map_err(WriteFileError::Surface)?;
+    let roles = encode_roles(&file.roles, scene).map_err(WriteFileError::Roles)?;
     for entry in &file.supports {
         let leaf = entry.support;
         if scene
@@ -259,6 +298,9 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     }
     if let Some(leaf) = unsupported_preview(&file.support_previews, &file.supports) {
         return Err(WriteFileError::PreviewWithoutSupports { leaf });
+    }
+    if let Some(leaf) = role_conflict(&file.roles, &file.supports, &file.hollows) {
+        return Err(WriteFileError::RoleConflict { leaf });
     }
     // Each mesh is encoded on its own, so they are encoded side by side.
     let meshes: Vec<Vec<u8>> = parallel::map(&scene.meshes, encode_mesh_v2)
@@ -282,6 +324,9 @@ pub fn write_file<W: Write>(file: &BreadFile, out: W) -> Result<W, WriteFileErro
     }
     if !file.surface.is_empty() {
         writer.chunk(SURFACE_TAG, SURFACE_VERSION, &surface)?;
+    }
+    if !file.roles.is_empty() {
+        writer.chunk(ROLE_TAG, ROLE_VERSION, &roles)?;
     }
     for payload in &meshes {
         writer.chunk(MESH_TAG, MESH_VERSION, payload)?;
@@ -342,7 +387,7 @@ fn read_chunks<'scope, R: Read>(
         Vec::new(),
         Vec::new(),
     );
-    let mut surfaces = Vec::new();
+    let (mut surfaces, mut roles) = (Vec::new(), Vec::new());
     let mut pending: Vec<PendingMesh<'scope>> = Vec::new();
     let mut running = std::collections::VecDeque::new();
     let threads = parallel::threads();
@@ -368,6 +413,7 @@ fn read_chunks<'scope, R: Read>(
                 HOLLOWS_TAG => hollows.push(current.then_some(chunk.payload)),
                 SUPPORT_PREVIEW_TAG => previews.push(chunk.payload),
                 SURFACE_TAG => surfaces.push(chunk.payload),
+                ROLE_TAG => roles.push(chunk.payload),
                 _ => {
                     let (version, payload) = (chunk.version, chunk.payload);
                     if threads < 2 || payload.len() < MESH_ON_ITS_OWN_THREAD {
@@ -413,6 +459,7 @@ fn read_chunks<'scope, R: Read>(
     let hollows = single(HOLLOWS_TAG, hollows)?.flatten();
     let previews = single(SUPPORT_PREVIEW_TAG, previews)?;
     let surface = single(SURFACE_TAG, surfaces)?;
+    let roles = single(ROLE_TAG, roles)?;
 
     let scene = decode_scene(&scene, meshes).map_err(ReadFileError::Scene)?;
     let supports = match supports {
@@ -439,6 +486,13 @@ fn read_chunks<'scope, R: Read>(
         None => Vec::new(),
         Some(payload) => decode_surface(&payload, &scene).map_err(ReadFileError::Surface)?,
     };
+    let roles = match roles {
+        None => Vec::new(),
+        Some(payload) => decode_roles(&payload, &scene).map_err(ReadFileError::Roles)?,
+    };
+    if let Some(leaf) = role_conflict(&roles, &supports, &hollows) {
+        return Err(ReadFileError::RoleConflict { leaf });
+    }
     Ok(BreadFile {
         scene,
         settings,
@@ -447,7 +501,30 @@ fn read_chunks<'scope, R: Read>(
         thumbnail,
         support_previews,
         surface,
+        roles,
     })
+}
+
+/// A leaf whose role contradicts the supports or hollows, which section 11
+/// forbids: a support leaf given the role of a raft, or the model of either
+/// given the role of supports or of a raft. Reserved roles mean a model, so
+/// they contradict nothing.
+fn role_conflict(
+    roles: &[RoleEntry],
+    supports: &[SupportEntry],
+    hollows: &[HollowEntry],
+) -> Option<usize> {
+    roles
+        .iter()
+        .filter(|entry| entry.is_known())
+        .find(|entry| {
+            let raft_on_support = entry.role == ROLE_RAFT
+                && supports.iter().any(|support| support.support == entry.leaf);
+            let model = supports.iter().any(|support| support.model == entry.leaf)
+                || hollows.iter().any(|hollow| hollow.model == entry.leaf);
+            raft_on_support || model
+        })
+        .map(|entry| entry.leaf)
 }
 
 /// A support leaf that is also the model of a hollow, which section 7.3
