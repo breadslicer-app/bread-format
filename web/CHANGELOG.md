@@ -2,10 +2,12 @@
 
 Newest first.
 
-## 2026-11-21, conformance files for roles
+## 2026-11-21, conformance files for roles and metadata
 
-- `conformance_valid` is 19 and `conformance_invalid` 23: version 2 of the spec adds the role
-  chunk, with `valid/roles` and four invalid `role-*` files.
+- `conformance_valid` is 22 and `conformance_invalid` 24: version 2 of the spec adds the role
+  chunk, with `valid/roles` and four invalid `role-*` files, and the metadata chunk, with
+  `valid/metadata`, `valid/metadata-ignored`, `valid/metadata-malformed` and
+  `invalid/two-metadata-chunks`.
 
 ## 2026-11-13, the top of the page is approved
 
