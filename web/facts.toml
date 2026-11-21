@@ -273,20 +273,20 @@ date = 2026-11-11
 # --- Conformance ---------------------------------------------------------------
 
 [facts.conformance_valid]
-value = 18
-unit = "files"
-what = "valid conformance files, each with a JSON of what it holds"
-source = "conformance/valid on main"
-derive = "files('conformance/valid/*.bread')"
-date = 2026-11-11
-
-[facts.conformance_invalid]
 value = 19
 unit = "files"
+what = "valid conformance files, each with a JSON of what it holds"
+source = "conformance/valid on main (roles added for version 2 of the spec)"
+derive = "files('conformance/valid/*.bread')"
+date = 2026-11-21
+
+[facts.conformance_invalid]
+value = 23
+unit = "files"
 what = "invalid conformance files, each with the reason a reader must refuse it for"
-source = "conformance/invalid on main (two-frames added in the read-through for version 1)"
+source = "conformance/invalid on main (two-frames added in the read-through for version 1; the four role-* for version 2 of the spec)"
 derive = "files('conformance/invalid/*.bread')"
-date = 2026-11-11
+date = 2026-11-21
 
 # --- The second reader ------------------------------------------------------------
 # notes/second-reader.md

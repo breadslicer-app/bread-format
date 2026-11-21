@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 2026-11-21, conformance files for roles
+
+- `conformance_valid` is 19 and `conformance_invalid` 23: version 2 of the spec adds the role
+  chunk, with `valid/roles` and four invalid `role-*` files.
+
 ## 2026-11-13, the top of the page is approved
 
 - `notes/launch.md` is `stable`: Damian approved the top of the page as drafted, with one change:
