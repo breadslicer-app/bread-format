@@ -30,6 +30,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bread-cli"
+version = "0.1.0"
+dependencies = [
+ "bread-format",
+]
+
+[[package]]
 name = "bread-format"
 version = "0.5.0"
 dependencies = [
