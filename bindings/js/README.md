@@ -71,6 +71,19 @@ and the mesh of its supports, in the leaf's own space, to draw wherever `placeMe
 leaf. `meshes` are the file's meshes, as `decodeMesh` gives them, which section 9.2's checks need. It
 returns an empty list for a file without previews, and throws a `BreadError` for previews it refuses.
 
+`decodeRoles(chunks)` returns the roles ([`SPEC.md`, section
+11](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md#11-roles-role)): each leaf that
+is not a model, with its `role`, `ROLE_SUPPORTS` (1) or `ROLE_RAFT` (2). A leaf not listed is a
+model, and a support leaf of a supports entry is supports anyway. It returns an empty list for a
+file without roles, and throws a `BreadError` for roles it refuses.
+
+`decodeMetadata(chunks)` returns the metadata ([`SPEC.md`, section
+12](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md#12-metadata-meta)): who made the
+file, how it may be used, and lasting ids for its parts. Each entry has `node` (`null` for the whole
+file), `key` and `value`, the bytes; `text` for a registered text key such as `title`, `designer`
+or `license` (`METADATA_TEXT_KEYS` lists them), and `uuid`, as `8-4-4-4-12` hex, for `uuid`. It
+never refuses a file for what the metadata holds: entries that break a rule are left out.
+
 ### Writing, with `bread-write.wasm`
 
 ```js
