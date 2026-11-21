@@ -30,3 +30,14 @@ The module is `target/wasm32-unknown-unknown/wasm/bread_wasm.wasm`. It imports n
 
 The third-party notices for meshoptimizer and zstd are in [NOTICE](NOTICE); keep them with the
 module wherever it goes.
+
+## As a native library
+
+The same ABI also builds as a native library, which is how the [Blender
+extension](../../blender) reads files, through Python's `ctypes`:
+
+```sh
+cargo build -p bread-wasm --release   # target/release/bread_wasm.dll, .so or .dylib
+```
+
+Natively, `usize` is 64 bits, and the memory never moves, so results can be read in place.

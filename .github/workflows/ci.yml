@@ -80,3 +80,8 @@ jobs:
           PYTHONPATH: src
       - name: Check the page's numbers against their data
         run: python web/check_facts.py
+      # The supports builder of the Blender extension needs numpy, not
+      # Blender. Importing in Blender is tested by hand (blender/README.md).
+      - run: python -m pip install --quiet numpy
+      - name: Blender extension, supports builder
+        run: python -m unittest discover -s blender/tests -p "test_supports.py" -v
