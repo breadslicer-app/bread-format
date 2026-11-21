@@ -1,6 +1,6 @@
 {
   "name": "bread-format",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reads and writes .bread files in JavaScript, through the bread-format crate built to WebAssembly.",
   "license": "Apache-2.0",
   "author": "SynrgStudio",

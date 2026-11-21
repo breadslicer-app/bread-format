@@ -7,7 +7,7 @@ updated: 2026-11-13
 Everything needed to read and write `.bread` is in the repository,
 https://github.com/breadslicer-app/bread-format, under Apache-2.0:
 
-- **the specification**, `SPEC.md`, version 1, frozen;
+- **the specification**, `SPEC.md`, version 2, frozen;
 - **the conformance files**, `conformance/`: valid files with what a reader must make of each, and
   invalid ones with the reason a reader must give for refusing them ([conformance.md](conformance.md));
 - **the reference implementation**, in Rust, also built to WebAssembly for JavaScript.

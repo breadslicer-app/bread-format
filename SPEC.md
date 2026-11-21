@@ -1,8 +1,8 @@
 # The `.bread` file format
 
-**Status:** version 2, in progress: it adds chunks to version 1 and changes nothing version 1
-describes. Version 1 is frozen (tag `spec-v1`); version 2 is tagged `spec-v2` once it is complete
-([3.6](#36-stability)).
+**Status:** version 2, frozen (tag `spec-v2`). It adds the role and metadata chunks to version 1
+(tag `spec-v1`) and changes nothing version 1 describes. From here on, what this document describes
+changes only through new versions ([3.6](#36-stability)).
 
 ## 1. Introduction
 
