@@ -77,6 +77,7 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`apps/converter`](apps/converter) | Bread Converter, a desktop program: STL to `.bread` and back, many files at once, in Breadslicer's look. |
 | [`crates/bread-cli`](crates/bread-cli) | `bread`, a command-line program: STL to `.bread` and back, and what a file holds. |
 | [`crates/bread-wasm`](crates/bread-wasm) | The same crate built to WebAssembly. |
+| [`crates/bread-thumbnails`](crates/bread-thumbnails) | Thumbnails of `.bread` files in Windows Explorer: a shell thumbnail provider. |
 | [`bindings/js`](bindings/js) | The JavaScript package, for the browser and Node, on that WebAssembly module. |
 | [`python/`](python) | A second reader, in plain Python, written from the specification alone. |
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |
