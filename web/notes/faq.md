@@ -40,8 +40,9 @@ Apache-2.0: anyone can read and write `.bread` in any program, open or closed, w
 permission to ask. Breadslicer, the slicer the format came from, is a separate program under the
 AGPL; using `.bread` puts none of its terms on anyone.
 
-**Is the specification stable?** Version 1 is frozen (tag `spec-v1`). From here on, the container
-and each chunk change only through new versions, never by editing version 1, and a file valid by
+**Is the specification stable?** Version 2 is frozen (tag `spec-v2`); it added the role and
+metadata chunks to version 1 (tag `spec-v1`) and changed nothing in it. From here on, the container
+and each chunk change only through new versions, never by editing a version, and a file valid by
 version 1 stays valid ([status.md](status.md)). A reader skips the chunks it does not know, so new
 chunks do not break old readers.
 

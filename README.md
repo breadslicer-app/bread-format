@@ -71,7 +71,7 @@ not know, so programs can keep data of their own beside the official chunks.
 
 | Folder | What |
 |---|---|
-| [`SPEC.md`](SPEC.md) | The specification: version 1 is frozen (tag `spec-v1`), version 2 adds chunks to it. |
+| [`SPEC.md`](SPEC.md) | The specification, version 2, frozen (tag `spec-v2`); version 1 is the tag `spec-v1`. |
 | [`conformance/`](conformance) | Valid and invalid files, each with what a reader must make of it. |
 | [`crates/bread-format`](crates/bread-format) | The reference implementation, in Rust: reads and writes `.bread`, and reads STL. |
 | [`crates/bread-wasm`](crates/bread-wasm) | The same crate built to WebAssembly. |

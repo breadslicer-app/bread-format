@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 2026-11-21, release 0.5.0 and the specification's version 2
+
+- `[project]`: the reference implementation is 0.5.0 (tag `v0.5.0`), with 0.4.0 among the earlier
+  versions. The crate on crates.io and the package on npm stay 0.4.0 and 0.1.0 until they are
+  published again. `chunk_versions` gains `ROLE` and `META`, version 1 each, and the
+  specification is version 2, frozen at the tag `spec-v2`.
+- `rules.md`, rule 5: the page quotes the specification as of `spec-v2`.
+- `notes/faq.md` and `notes/implementers.md`: the specification is version 2.
+
 ## 2026-11-21, conformance files for roles and metadata
 
 - `conformance_valid` is 22 and `conformance_invalid` 24: version 2 of the spec adds the role

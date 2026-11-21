@@ -8,7 +8,7 @@ can be stored without losing anything, with room for a slicer's data such as edi
 - **Small:** 2,288 binary STL miniatures, 162 GB in all, became 11.6 GB of `.bread`, every one of
   them bit for bit ([how it was measured](https://github.com/breadslicer-app/bread-format/blob/main/web/notes/mz4250-corpus.md)).
 - **Open:** the format is described in
-  [`SPEC.md`](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md), version 1, frozen,
+  [`SPEC.md`](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md), version 2, frozen,
   with conformance files that any reader can check itself against. Specification and code are
   Apache-2.0.
 
