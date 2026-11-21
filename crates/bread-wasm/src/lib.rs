@@ -25,9 +25,12 @@ use bread_format::{
     write_file,
 };
 use bread_format::{
-    BreadReader, Chunk, ChunkTag, DecodeMeshError, DecodePreviewsError, MESH_TAG, Mesh,
-    ReadBreadError, SCENE_TAG, SUPPORT_PREVIEW_TAG, Scene, SupportPreview, decode_mesh,
-    decode_mesh_v2, decode_previews, decode_scene, supported_version,
+    BreadReader, Chunk, ChunkTag, DecodeMeshError, DecodePreviewsError, HOLLOWS_TAG,
+    HOLLOWS_VERSION, MESH_TAG, METADATA_TAG, METADATA_VERSION, Mesh, MetadataEntry, ROLE_RAFT,
+    ROLE_TAG, ROLE_VERSION, ReadBreadError, RoleEntry, SCENE_TAG, SUPPORT_PREVIEW_TAG,
+    SUPPORTS_TAG, SUPPORTS_VERSION, Scene, SupportPreview, decode_hollows, decode_mesh,
+    decode_mesh_v2, decode_metadata, decode_previews, decode_roles, decode_scene, decode_supports,
+    supported_version,
 };
 
 pub mod abi;
@@ -156,6 +159,86 @@ pub fn decode_previews_chunk(
         },
         chunk: Some(SUPPORT_PREVIEW_TAG),
     })
+}
+
+/// The roles in the payload of a role chunk of `version`, checked as
+/// `SPEC.md` 11.2 says: against the file's scene, the scene chunk payload of
+/// `scene_version` over `mesh_count` mesh chunks, and against its supports
+/// and hollows chunks, each given as its version and payload when the file
+/// has one. Older supports and hollows chunks are drafts, which name nothing.
+#[allow(clippy::too_many_arguments)]
+pub fn decode_roles_chunk(
+    version: u16,
+    payload: &[u8],
+    scene_version: u16,
+    scene_payload: &[u8],
+    mesh_count: usize,
+    supports: Option<(u16, &[u8])>,
+    hollows: Option<(u16, &[u8])>,
+) -> Result<Vec<RoleEntry>, Refusal> {
+    let refused = |reason, tag| Refusal {
+        reason,
+        chunk: Some(tag),
+    };
+    if version == 0 || version > ROLE_VERSION {
+        return Err(refused("version", ROLE_TAG));
+    }
+    let scene = decode_scene_chunk(scene_version, scene_payload, mesh_count)?;
+    let (support_leaves, mut models) = match supports {
+        Some((0, _)) => return Err(refused("version", SUPPORTS_TAG)),
+        Some((v, _)) if v > SUPPORTS_VERSION => return Err(refused("version", SUPPORTS_TAG)),
+        Some((SUPPORTS_VERSION, payload)) => {
+            let entries =
+                decode_supports(payload, &scene).map_err(|_| refused("malformed", SUPPORTS_TAG))?;
+            (
+                entries.iter().map(|e| e.support).collect::<Vec<_>>(),
+                entries.iter().map(|e| e.model).collect::<Vec<_>>(),
+            )
+        }
+        _ => (Vec::new(), Vec::new()),
+    };
+    match hollows {
+        Some((0, _)) => return Err(refused("version", HOLLOWS_TAG)),
+        Some((v, _)) if v > HOLLOWS_VERSION => return Err(refused("version", HOLLOWS_TAG)),
+        Some((HOLLOWS_VERSION, payload)) => {
+            let entries =
+                decode_hollows(payload, &scene).map_err(|_| refused("malformed", HOLLOWS_TAG))?;
+            models.extend(entries.iter().map(|e| e.model));
+        }
+        _ => {}
+    }
+    let roles = decode_roles(payload, &scene).map_err(|_| refused("malformed", ROLE_TAG))?;
+    // A reserved role means a model, which contradicts nothing.
+    let conflict = roles.iter().filter(|entry| entry.is_known()).any(|entry| {
+        models.contains(&entry.leaf)
+            || (entry.role == ROLE_RAFT && support_leaves.contains(&entry.leaf))
+    });
+    if conflict {
+        return Err(refused("malformed", ROLE_TAG));
+    }
+    Ok(roles)
+}
+
+/// The metadata in the payload of a metadata chunk of `version`, against the
+/// file's scene, the scene chunk payload of `scene_version` over
+/// `mesh_count` mesh chunks. Entries that break a rule of `SPEC.md` 12 are
+/// left out, and a malformed payload is no metadata: only the version or the
+/// scene can refuse it.
+pub fn decode_metadata_chunk(
+    version: u16,
+    payload: &[u8],
+    scene_version: u16,
+    scene_payload: &[u8],
+    mesh_count: usize,
+) -> Result<Vec<MetadataEntry>, Refusal> {
+    if version == 0 || version > METADATA_VERSION {
+        return Err(Refusal {
+            reason: "version",
+            chunk: Some(METADATA_TAG),
+        });
+    }
+    let scene = decode_scene_chunk(scene_version, scene_payload, mesh_count)?;
+    Ok(decode_metadata(payload, &scene))
 }
 
 #[cfg(feature = "write")]
