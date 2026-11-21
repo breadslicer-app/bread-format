@@ -80,11 +80,13 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |
 | [`tools/corpus-bench`](tools/corpus-bench) | Measures `.bread` on a folder of STL files. |
 
-None of them is published to a package registry yet. To use the crate, take it from here:
+The crate is on [crates.io](https://crates.io/crates/bread-format) and the JavaScript package on
+[npm](https://www.npmjs.com/package/bread-format), both as `bread-format`. The Python reader is not
+on a package registry.
 
 ```toml
 [dependencies]
-bread-format = { git = "https://github.com/breadslicer-app/bread-format" }
+bread-format = "0.4"
 ```
 
 ```rust
