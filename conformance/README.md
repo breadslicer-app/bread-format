@@ -24,6 +24,7 @@ what it reads matches the JSON.
 | `support_previews` | the `SPRV` previews, in order: each has `leaf`, the support leaf's node index, and `mesh`, as for the meshes |
 | `surface` | the `SURF` entries, in order: each has `leaf`, `kind`, the document `version`, and the document's `document_size` and `document_sha256` |
 | `roles` | the `ROLE` entries, in order: each has `leaf`, the node index, and `role`, `1` supports or `2` a raft |
+| `metadata` | the `META` entries a reader keeps, in order: each has `subject`, the node index or `null` for the whole file, `key`, and `value`: the text for a registered text key, the UUID as lowercase hex grouped 8-4-4-4-12 for `uuid`, and for a program's own key its `size` and `sha256` |
 
 Each mesh:
 

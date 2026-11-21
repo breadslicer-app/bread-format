@@ -22,7 +22,7 @@ const bread = await load(readFileSync(wasm));
 
 /** The reasons a container reader gives on its own. */
 const CONTAINER_REASONS = ['not-bread', 'version', 'cut-short', 'crc', 'bad-payload'];
-const KNOWN = ['THMB', 'SCNE', 'PROJ', 'SUPP', 'HOLW', 'SURF', 'ROLE', 'MESH', 'SPRV'];
+const KNOWN = ['THMB', 'SCNE', 'PROJ', 'SUPP', 'HOLW', 'SURF', 'ROLE', 'META', 'MESH', 'SPRV'];
 
 function cases(dir) {
 	const names = readdirSync(join(conformance, dir))

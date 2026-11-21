@@ -19,6 +19,7 @@ from ._bytes import Meta
 from .errors import BreadError
 from .file import BreadFile, read_file
 from .mesh import Mesh, read_mesh
+from .metadata import MetaEntry
 from .scene import IDENTITY, Node, Scene, Transform, apply, compose
 from .slicer import Entry, Paint, Role, fingerprint_of
 
@@ -29,6 +30,7 @@ __all__ = [
     "Entry",
     "Mesh",
     "Meta",
+    "MetaEntry",
     "Node",
     "Paint",
     "Role",
