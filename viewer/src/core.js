@@ -5,11 +5,14 @@
 // turn STL files into one and check it, and write the scene back out as STL.
 // The worker runs it off the page's thread; the tests run it in Node.
 
-import { placeMeshes } from './bread.js';
+import { ROLE_RAFT, ROLE_SUPPORTS, placeMeshes } from './bread.js';
 
 /**
  * A `.bread` file, read: its scene, its meshes, every leaf shown with the
- * mesh it shows and where, and the support previews, by leaf.
+ * mesh it shows and where, the support previews, by leaf, the roles of the
+ * leaves that are not models (SPEC.md 11), what each placement shows
+ * (`kinds`: `'model'`, `'supports'` or `'raft'`), and the metadata
+ * (SPEC.md 12).
  *
  * @param {import('./bread.js').Bread} bread a loaded module
  * @param {Uint8Array} bytes
@@ -20,7 +23,60 @@ export function openBread(bread, bytes) {
 	const meshes = chunks.filter((chunk) => chunk.tag === 'MESH').map((chunk) => bread.decodeMesh(chunk));
 	const placements = placeMeshes(scene);
 	const previews = bread.decodePreviews(chunks, meshes);
-	return { scene, meshes, placements, previews, chunks: chunks.map((chunk) => chunk.tag) };
+	const roles = bread.decodeRoles(chunks);
+	const metadata = bread.decodeMetadata(chunks);
+	const kinds = kindsOf(placements, roles, previews);
+	return { scene, meshes, placements, previews, roles, kinds, metadata, chunks: chunks.map((chunk) => chunk.tag) };
+}
+
+/**
+ * What each placement shows: `'supports'` or `'raft'` when the role chunk
+ * says so, `'supports'` for a leaf with a support preview, which only a
+ * support leaf has, and `'model'` for the rest. A reserved role means a
+ * model.
+ */
+export function kindsOf(placements, roles, previews) {
+	const byLeaf = new Map(roles.map((r) => [r.leaf, r.role]));
+	const previewed = new Set(previews.map((p) => p.leaf));
+	return placements.map(({ leaf }) => {
+		const role = byLeaf.get(leaf);
+		if (role === ROLE_RAFT) return 'raft';
+		if (role === ROLE_SUPPORTS || previewed.has(leaf)) return 'supports';
+		return 'model';
+	});
+}
+
+/**
+ * Who made a file, as its metadata about the whole file says: the text of
+ * `title`, `designer`, `license`, `source`, `copyright` and `description`,
+ * those it has, and `link`, the source as an address the page may link to,
+ * or `null`.
+ *
+ * @param {{ node: number | null, key: string, text: string | null }[]} metadata as `decodeMetadata` gives it
+ */
+export function creditOf(metadata) {
+	const credit = {};
+	for (const key of ['title', 'designer', 'license', 'source', 'copyright', 'description']) {
+		const entry = metadata.find((e) => e.node === null && e.key === key && e.text !== null);
+		if (entry) credit[key] = entry.text;
+	}
+	credit.link = credit.source === undefined ? null : webLink(credit.source);
+	return credit;
+}
+
+/**
+ * `text` as a web address the page may link to: only `http:` and `https:`,
+ * so a file cannot hand the page a `javascript:` or `data:` link; `null` for
+ * anything else.
+ */
+export function webLink(text) {
+	let url;
+	try {
+		url = new URL(text.trim());
+	} catch {
+		return null;
+	}
+	return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
 }
 
 /** The support preview of each placement's leaf, as an index into `previews`, or -1. */

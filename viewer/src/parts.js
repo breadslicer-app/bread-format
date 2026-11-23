@@ -17,6 +17,8 @@ addWords({
 		partTriangles: '{count} triangles',
 		partTriangle: '1 triangle',
 		show: 'Show {name}',
+		kindSupports: 'supports',
+		kindRaft: 'raft',
 	},
 	es: {
 		partsTitle: 'Piezas',
@@ -26,6 +28,8 @@ addWords({
 		partTriangles: '{count} triángulos',
 		partTriangle: '1 triángulo',
 		show: 'Mostrar {name}',
+		kindSupports: 'soportes',
+		kindRaft: 'balsa',
 	},
 });
 
@@ -99,6 +103,14 @@ function list(file) {
 		label.className = 'part-name';
 		label.textContent = name;
 		label.title = name;
+		// A leaf that is not a model says what it is.
+		const kind = file.kinds?.[i];
+		if (kind === 'supports' || kind === 'raft') {
+			const tag = document.createElement('span');
+			tag.className = 'part-kind';
+			tag.textContent = translate(kind === 'raft' ? 'kindRaft' : 'kindSupports');
+			label.append(' ', tag);
+		}
 		const size = file.sizes[i];
 		const detail = document.createElement('div');
 		detail.className = 'part-detail';
