@@ -330,9 +330,14 @@ pub fn grouped(n: usize) -> String {
     out
 }
 
-/// What a `.bread` file holds, said in lines: its chunks, its meshes, the
-/// parts it shows and the slicer data it keeps. A file the format refuses
-/// gives the reason instead.
+mod about;
+
+use about::printable;
+
+/// What a `.bread` file holds, said in lines: first who made it, when its
+/// metadata says so, then its chunks, its meshes, the parts it shows and the
+/// slicer data it keeps, which leaves are not models, and its metadata. A
+/// file the format refuses gives the reason instead.
 pub fn info(bytes: &[u8]) -> Result<Vec<String>, Error> {
     let mut lines = vec![format!("{} bytes", grouped(bytes.len()))];
     let mut reader = BreadReader::new(bytes).map_err(|e| Error(e.to_string()))?;
@@ -346,9 +351,14 @@ pub fn info(bytes: &[u8]) -> Result<Vec<String>, Error> {
         ));
     }
     let file = read_file(bytes).map_err(|e| Error(e.to_string()))?;
+    // Who made it comes first, where it is seen.
+    let credit = about::credit(&file);
+    if !credit.is_empty() {
+        lines.splice(0..0, credit);
+    }
     let scene = &file.scene;
     if let Some(name) = scene.meta.as_ref().and_then(|m| m.name.as_deref()) {
-        lines.push(format!("scene: {name}"));
+        lines.push(format!("scene: {}", printable(name)));
     }
     let triangles: usize = scene.meshes.iter().map(|m| m.triangles.len()).sum();
     lines.push(format!(
@@ -361,7 +371,8 @@ pub fn info(bytes: &[u8]) -> Result<Vec<String>, Error> {
         let name = mesh.meta.as_ref().and_then(|m| m.name.as_deref());
         lines.push(format!(
             "  {i}{}  {} vertices, {} triangles",
-            name.map(|n| format!(" {n}")).unwrap_or_default(),
+            name.map(|n| format!(" {}", printable(n)))
+                .unwrap_or_default(),
             grouped(mesh.vertices.len()),
             grouped(mesh.triangles.len())
         ));
@@ -399,6 +410,8 @@ pub fn info(bytes: &[u8]) -> Result<Vec<String>, Error> {
     if !extra.is_empty() {
         lines.push(format!("also: {}", extra.join(", ")));
     }
+    lines.extend(about::roles(&file));
+    lines.extend(about::metadata(&file));
     Ok(lines)
 }
 

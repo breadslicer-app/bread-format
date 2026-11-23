@@ -26,6 +26,10 @@ that is already there unless told to with `--force`.
   and rounded to f32 (SPEC 5.4). Parts with no transform keep their vertices bit for bit. Support
   leaves show their support preview, when the file has one.
 - **`info`** lists a file's chunks, its meshes, the parts it shows and the slicer data it keeps.
+  Who made the file comes first, when its metadata says so: its title, designer, license and
+  source. After the parts, the leaves that are not models, each with its role (supports or a
+  raft), and every metadata entry, about the file and about each node. Text from the file is
+  printed with control characters escaped, so it cannot drive the terminal.
 - **`check`** reads a file as every reader must, and says why it refuses it, if it does. It exits
   with 1 when a file is refused.
 
