@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 SynrgStudio
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Reads .bread files with the bread-format crate, built as a native library
-from crates/bread-wasm: the same code, and the same checks, as every other
-reader of the format. Its C ABI is the one the JavaScript package calls;
+"""Reads and writes .bread files with the bread-format crate, built as a
+native library from crates/bread-wasm with its `write` feature: the same
+code, and the same checks, as every other reader and writer of the format. Its C ABI is the one the JavaScript package calls;
 here ctypes calls it."""
 
 from __future__ import annotations
@@ -82,6 +82,12 @@ def _load() -> ctypes.CDLL:
         "bread_refusal_reason": (ptr, []),
         "bread_refusal_reason_len": (size, []),
         "bread_refusal_chunk": (u32, []),
+        "bread_write_begin": (None, []),
+        "bread_write_mesh": (u32, [ptr, size, ptr, size, u32, ptr, size, ptr, size]),
+        "bread_write_metadata": (None, [ptr, size]),
+        "bread_write_file": (u32, [ptr, size]),
+        "bread_output": (ptr, []),
+        "bread_output_len": (size, []),
     }
     for fn, (restype, argtypes) in signatures.items():
         f = getattr(lib, fn)
@@ -270,5 +276,41 @@ def decode_previews(chunks: list[Chunk], empty: list[bool]) -> dict[int, Mesh]:
             if lib.bread_preview_select(i):
                 out[leaf] = _current_mesh(lib)
         return out
+    finally:
+        lib.bread_release()
+
+
+def write_file(
+    meshes: list[tuple[np.ndarray, np.ndarray]], scene: bytes, metadata: bytes | None = None
+) -> bytes:
+    """The bytes of a .bread file: ``meshes`` as (vertices, triangles), the
+    vertices (n, 3) f32 kept bit for bit and the triangles (m, 3) u32 in
+    order; ``scene`` a scene chunk payload over them, and ``metadata`` a
+    metadata chunk payload, or None for none. The crate checks the scene and
+    the metadata as a reader does, and raises BreadError when it refuses
+    them."""
+    lib = library()
+    keep = []
+
+    def buffer(data: bytes):
+        # Never a null pointer, even for no bytes: Rust takes a slice of it.
+        b = ctypes.create_string_buffer(data, max(len(data), 1))
+        keep.append(b)
+        return b, len(data)
+
+    try:
+        lib.bread_write_begin()
+        for vertices, triangles in meshes:
+            v, v_len = buffer(np.ascontiguousarray(vertices, dtype="<f4").tobytes())
+            t, t_len = buffer(np.ascontiguousarray(triangles, dtype="<u4").tobytes())
+            if not lib.bread_write_mesh(v, v_len, t, t_len, 0, None, 0, None, 0):
+                raise _refusal(lib)
+        if metadata is not None:
+            m, m_len = buffer(metadata)
+            lib.bread_write_metadata(m, m_len)
+        s, s_len = buffer(scene)
+        if not lib.bread_write_file(s, s_len):
+            raise _refusal(lib)
+        return ctypes.string_at(lib.bread_output(), lib.bread_output_len())
     finally:
         lib.bread_release()

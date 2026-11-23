@@ -34,10 +34,14 @@ module wherever it goes.
 ## As a native library
 
 The same ABI also builds as a native library, which is how the [Blender
-extension](../../blender) reads files, through Python's `ctypes`:
+extension](../../blender) reads and writes files, through Python's `ctypes`:
 
 ```sh
-cargo build -p bread-wasm --release   # target/release/bread_wasm.dll, .so or .dylib
+cargo build -p bread-wasm --release --features write   # target/release/bread_wasm.dll, .so or .dylib
 ```
+
+With `write`, `bread_write_metadata` gives the file being written a metadata chunk payload
+(`SPEC.md`, section 12), which is refused as `malformed` when a reader would leave out any of its
+entries.
 
 Natively, `usize` is 64 bits, and the memory never moves, so results can be read in place.

@@ -14,15 +14,16 @@
 //! ABI that the JavaScript package calls.
 //!
 //! With the `write` feature, `read_stl_mesh` reads an STL and `write_bread`
-//! writes a file, behind [`write_abi`]. Writing takes zstd's compressor and
+//! writes a file, with metadata through `write_bread_with_metadata`, behind
+//! [`write_abi`]. Writing takes zstd's compressor and
 //! meshoptimizer's encoders, which more than double the module, so the
 //! JavaScript package builds it twice: `bread.wasm` reads, and
 //! `bread-write.wasm` also writes.
 
 #[cfg(feature = "write")]
 use bread_format::{
-    BreadFile, EncodeMeshError, EncodeSceneError, ReadStlError, WriteFileError, read_stl,
-    write_file,
+    BreadFile, EncodeMeshError, EncodeSceneError, ReadStlError, WriteFileError, encode_metadata,
+    read_stl, write_file,
 };
 use bread_format::{
     BreadReader, Chunk, ChunkTag, DecodeMeshError, DecodePreviewsError, HOLLOWS_TAG,
@@ -264,12 +265,42 @@ pub fn read_stl_mesh(bytes: &[u8]) -> Result<Mesh, Refusal> {
 /// refused as `no-such-vertex` when a triangle names a vertex it does not
 /// have, and as `too-large` past what a mesh chunk holds.
 pub fn write_bread(meshes: Vec<Mesh>, scene_payload: &[u8]) -> Result<Vec<u8>, Refusal> {
+    write_bread_with_metadata(meshes, scene_payload, None)
+}
+
+#[cfg(feature = "write")]
+/// As [`write_bread`], and with the metadata of `metadata_payload`, a
+/// metadata chunk payload over the same scene (`SPEC.md`, section 12), when
+/// it is given. A reader reads an entry that breaks a rule as absent; a
+/// writer refuses the whole payload as `malformed` instead, so that nothing
+/// it was given is dropped without a word.
+pub fn write_bread_with_metadata(
+    meshes: Vec<Mesh>,
+    scene_payload: &[u8],
+    metadata_payload: Option<&[u8]>,
+) -> Result<Vec<u8>, Refusal> {
     let scene = decode_scene(scene_payload, meshes).map_err(|_| Refusal {
         reason: "malformed",
         chunk: Some(SCENE_TAG),
     })?;
+    let metadata = match metadata_payload {
+        None => Vec::new(),
+        Some(payload) => {
+            let entries = decode_metadata(payload, &scene);
+            // Encoding keeps the entries' order, so the entries come back
+            // to the same bytes only when every one was kept.
+            if encode_metadata(&entries, &scene).ok().as_deref() != Some(payload) {
+                return Err(Refusal {
+                    reason: "malformed",
+                    chunk: Some(METADATA_TAG),
+                });
+            }
+            entries
+        }
+    };
     let file = BreadFile {
         scene,
+        metadata,
         ..BreadFile::default()
     };
     write_file(&file, Vec::new()).map_err(|err| {
@@ -277,6 +308,7 @@ pub fn write_bread(meshes: Vec<Mesh>, scene_payload: &[u8]) -> Result<Vec<u8>, R
             WriteFileError::Mesh(EncodeMeshError::VertexOutOfRange) => ("no-such-vertex", MESH_TAG),
             WriteFileError::Mesh(_) => ("too-large", MESH_TAG),
             WriteFileError::Scene(EncodeSceneError::TooLarge) => ("too-large", SCENE_TAG),
+            WriteFileError::Metadata(_) => ("too-large", METADATA_TAG),
             // The scene was decoded with every check above, and the file
             // holds nothing else.
             _ => ("malformed", SCENE_TAG),

@@ -1,7 +1,11 @@
 # .bread for Blender
 
-A Blender extension that opens `.bread` files: File › Import › Bread (.bread), or drop files on
-the 3D Viewport or the Outliner. A dialog asks what to bring, all of it ticked:
+A Blender extension that opens `.bread` files and saves them.
+
+## Import
+
+File › Import › Bread (.bread), or drop files on the 3D Viewport or the Outliner. A dialog asks
+what to bring, all of it ticked:
 
 - **Mesh:** the models, bit for bit: the same vertex coordinates and the same triangles, in their
   order. Leaves that share a mesh share it in Blender too.
@@ -15,13 +19,32 @@ the 3D Viewport or the Outliner. A dialog asks what to bring, all of it ticked:
 Lengths in a `.bread` file are millimetres; **Scale** gives Blender units per millimetre, 1 by
 default, as Blender's STL importer.
 
+## Export
+
+File › Export › Bread (.bread) saves the objects of the scene, or only the selected ones, as one
+`.bread` file:
+
+- **Parts:** each object is a named part, in its place. Faces are saved as triangles; a mesh made
+  only of triangles keeps them in their order, so a file imported and exported again comes back
+  with the same vertex bits and triangles. Objects that show the same mesh share it in the file.
+- **Apply Modifiers:** each object as it shows, with its modifiers. An object without modifiers or
+  shape keys is saved bit for bit either way. Curves, surfaces and text are saved when this is on.
+- **Scale:** Blender units per millimetre, as on import: 1 by default, 0.001 for a scene in metres.
+- **Credit:** a title, the designer, the license (an SPDX expression, such as `CC-BY-4.0`) and a
+  link to the source go in the file's metadata ([`META`](../SPEC.md#12-metadata-meta)), with the
+  date and the program that wrote it. They travel with every copy, and programs that open the file
+  can show them. Each one left empty is left out.
+
+Supports and hollows are not written back as such: an imported support comes back as a model.
+
 It needs Blender 4.2 or later, and has been tried on Blender 5.2.
 
 ## How it works
 
-- `bread_import/native.py` reads files with the `bread-format` crate, built as a native library
-  from [`crates/bread-wasm`](../crates/bread-wasm): the C ABI the JavaScript package calls, here
-  called through `ctypes`. Every check of the format comes with it.
+- `bread_import/native.py` reads and writes files with the `bread-format` crate, built as a
+  native library from [`crates/bread-wasm`](../crates/bread-wasm) with its `write` feature: the C
+  ABI the JavaScript package calls, here called through `ctypes`. Every check of the format comes
+  with it, and the meshes are written as the crate writes them, `MESH` version 2.
 - `bread_import/contents.py` places the scene ([SPEC 5.4](../SPEC.md#54-placing-the-meshes)) and
   reads which leaves are models, hollows and supports.
 - `bread_import/supports.py` builds the supports. Breadslicer's supports document (generator `df`,
@@ -35,8 +58,11 @@ foot a little wider than a line of a line raft, as Breadslicer draws it; each st
   "Raft": it comes with the supports, as it is, and the supports build none of their own. Pieces
   overlap and are not merged, as a slicer expects. They are built with numpy, in batches: about
   0.06 s for a figure with 600 supports.
-- `bread_import/importer.py` is the operator, the menu entry and the file handler for dropped
-  files.
+- `bread_import/importer.py` is the import operator, the menu entry and the file handler for
+  dropped files.
+- `bread_import/writing.py` turns the parts into a scene chunk and the credit into a metadata
+  chunk, which the crate checks as a reader does before it writes the file, and
+  `bread_import/exporter.py` is the export operator and its menu entry.
 
 ## Build
 
@@ -56,10 +82,14 @@ for the platform the script runs on; the zip so far is for Windows (`platforms` 
 ```
 python -m unittest discover blender/tests -p "test_supports.py"
 blender -b --factory-startup --python-exit-code 1 --python blender/tests/test_import.py
+blender -b --factory-startup --python-exit-code 1 --python blender/tests/test_export.py
 ```
 
 The first needs numpy, not Blender. The second, after `build.py`, imports every valid
-conformance file and checks that each mesh arrives bit for bit.
+conformance file and checks that each mesh arrives bit for bit. The third exports each of them
+again and imports the result, which comes back with the same mesh bits and triangles in the same
+places, and checks shared meshes, triangulation, modifiers, the selection, the scale and the
+credit.
 
 ## License
 

@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 SynrgStudio
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Builds the Blender extension: the .bread reader as a native library, then
-the extension's zip in blender/dist.
+"""Builds the Blender extension: the .bread reader and writer as a native
+library, then the extension's zip in blender/dist.
 
     python blender/build.py [--install]
 
@@ -49,7 +49,10 @@ def main() -> None:
     if sys.platform == "win32":
         # No dependency on the Visual C++ runtime being installed.
         env["RUSTFLAGS"] = (env.get("RUSTFLAGS", "") + " -C target-feature=+crt-static").strip()
-    subprocess.run(["cargo", "build", "--release", "-p", "bread-wasm"], cwd=REPO, env=env, check=True)
+    subprocess.run(
+        ["cargo", "build", "--release", "-p", "bread-wasm", "--features", "write"],
+        cwd=REPO, env=env, check=True,
+    )
 
     lib = SOURCE / "lib"
     lib.mkdir(exist_ok=True)

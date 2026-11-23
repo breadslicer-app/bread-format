@@ -10,7 +10,8 @@
 #![allow(unsafe_code)]
 
 use bread_format::{
-    MESH_TAG, Mesh, Meta, Node, NodeKind, SCENE_TAG, Scene, Transform, encode_scene, read_file,
+    MESH_TAG, METADATA_TAG, Mesh, Meta, MetadataEntry, Node, NodeKind, SCENE_TAG, Scene, Transform,
+    encode_metadata, encode_scene, read_file,
 };
 use bread_wasm::abi::{
     bread_alloc, bread_free, bread_mesh_triangle_count, bread_mesh_vertex_count,
@@ -18,9 +19,9 @@ use bread_wasm::abi::{
 };
 use bread_wasm::write_abi::{
     bread_output, bread_output_len, bread_read_stl, bread_write_begin, bread_write_file,
-    bread_write_mesh,
+    bread_write_mesh, bread_write_metadata,
 };
-use bread_wasm::{Refusal, read_stl_mesh, write_bread};
+use bread_wasm::{Refusal, read_stl_mesh, write_bread, write_bread_with_metadata};
 
 fn named(name: &str) -> Option<Meta> {
     Some(Meta {
@@ -68,6 +69,58 @@ fn a_written_file_reads_back_the_same() {
     let scene = kit();
     let bytes = write_bread(scene.meshes.clone(), &encode_scene(&scene).unwrap()).unwrap();
     assert_eq!(read_file(bytes.as_slice()).unwrap().scene, scene);
+}
+
+/// A title and a designer for the file, and an id for the kit's second leaf.
+fn credits() -> Vec<MetadataEntry> {
+    vec![
+        MetadataEntry::text(None, "title", "Kit"),
+        MetadataEntry::text(None, "designer", "A. Designer"),
+        MetadataEntry::uuid(Some(1), [7; 16]),
+    ]
+}
+
+#[test]
+fn metadata_is_written_and_reads_back() {
+    let scene = kit();
+    let payload = encode_metadata(&credits(), &scene).unwrap();
+    let bytes = write_bread_with_metadata(
+        scene.meshes.clone(),
+        &encode_scene(&scene).unwrap(),
+        Some(&payload),
+    )
+    .unwrap();
+    let file = read_file(bytes.as_slice()).unwrap();
+    assert_eq!(file.scene, scene);
+    assert_eq!(file.metadata, credits());
+}
+
+#[test]
+fn metadata_a_reader_would_drop_is_not_written() {
+    let scene = kit();
+    let scene_payload = encode_scene(&scene).unwrap();
+    let refused = Err(Refusal {
+        reason: "malformed",
+        chunk: Some(METADATA_TAG),
+    });
+    // An id for node 2, which the kit does not have: a reader drops it.
+    let mut entries = credits();
+    let at = Scene {
+        nodes: vec![scene.nodes[0].clone(); 3],
+        roots: Vec::new(),
+        ..scene.clone()
+    };
+    entries.push(MetadataEntry::uuid(Some(2), [8; 16]));
+    let payload = encode_metadata(&entries, &at).unwrap();
+    assert_eq!(
+        write_bread_with_metadata(scene.meshes.clone(), &scene_payload, Some(&payload)),
+        refused
+    );
+    // A payload that is not one: a reader reads it as no metadata.
+    assert_eq!(
+        write_bread_with_metadata(scene.meshes, &scene_payload, Some(b"")),
+        refused
+    );
 }
 
 #[test]
@@ -211,6 +264,37 @@ fn the_abi_writes_a_file() {
     assert_eq!(again, 0);
     assert_eq!(refusal_reason(), b"malformed");
     assert_eq!(bread_output_len(), 0);
+    bread_release();
+}
+
+#[test]
+fn the_abi_writes_metadata_once() {
+    let scene = kit();
+    let payload = encode_scene(&scene).unwrap();
+    let metadata = encode_metadata(&credits(), &scene).unwrap();
+    let write = |with_metadata: bool| {
+        bread_write_begin();
+        for mesh in &scene.meshes {
+            assert_eq!(add_mesh(mesh), 1);
+        }
+        if with_metadata {
+            // SAFETY: the payload's bytes, as `with_input` hands them over.
+            with_input(&metadata, |ptr, len| unsafe {
+                bread_write_metadata(ptr, len)
+            });
+        }
+        // SAFETY: as above.
+        assert_eq!(
+            with_input(&payload, |ptr, len| unsafe { bread_write_file(ptr, len) }),
+            1
+        );
+        // SAFETY: the output of the last write, still kept.
+        let bytes = unsafe { std::slice::from_raw_parts(bread_output(), bread_output_len()) };
+        read_file(bytes).unwrap().metadata
+    };
+    assert_eq!(write(true), credits());
+    // Writing used it up: the next file has none.
+    assert_eq!(write(false), Vec::new());
     bread_release();
 }
 
