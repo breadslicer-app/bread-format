@@ -1,3 +1,7 @@
 # The conformance files are compared byte for byte, on every platform.
 *.bread binary
 conformance/**/*.json text eol=lf
+
+# Windows command scripts run with Windows line ends, shell scripts with Unix ones.
+*.cmd text eol=crlf
+*.sh text eol=lf

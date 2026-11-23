@@ -82,6 +82,7 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`python/`](python) | A second reader, in plain Python, written from the specification alone. |
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |
 | [`tools/corpus-bench`](tools/corpus-bench) | Measures `.bread` on a folder of STL files. |
+| [`tools/release`](tools/release) | Builds the programs for download. |
 
 The crate is on [crates.io](https://crates.io/crates/bread-format) and the JavaScript package on
 [npm](https://www.npmjs.com/package/bread-format), both as `bread-format`. The Python reader is not
@@ -111,6 +112,11 @@ The JavaScript package and the Python reader say how to build and use them in th
 - **The viewer** at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/).
 - **[`bread`](crates/bread-cli)**, the command-line program in this repository.
 - **[Bread Converter](apps/converter)**, the desktop converter in this repository.
+
+From the first programs release (tag `tools-v0.1.0`) on, `bread`, Bread Converter and the
+Explorer thumbnails are built for download on the
+[releases page](https://github.com/breadslicer-app/bread-format/releases), with nothing to
+install: `bread` for Windows, Linux and macOS, the other two for Windows.
 
 To write a reader of your own, start from [`SPEC.md`](SPEC.md) and check it against
 [`conformance/`](conformance).

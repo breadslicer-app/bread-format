@@ -38,6 +38,10 @@ The DLL imports only system libraries.
 
 ## Registering
 
+The download on the [releases page](https://github.com/breadslicer-app/bread-format/releases)
+has the DLL with `register.cmd` and `unregister.cmd`, which do the `regsvr32` steps below for the
+current user, without administrator rights.
+
 The class id is `{AF9572F8-199D-4710-88C0-5D553D38F093}`. A provider needs two
 registry keys, under `HKEY_LOCAL_MACHINE\Software\Classes` for every user or
 `HKEY_CURRENT_USER\Software\Classes` for one:
