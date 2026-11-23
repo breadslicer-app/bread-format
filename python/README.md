@@ -2,13 +2,21 @@
 
 Reads `.bread` files: triangle meshes, kept bit for bit, and the scene that places them.
 
-This reader is written from the specification alone, [`SPEC.md`](../SPEC.md), without the code
-of the reference implementation, and uses nothing but the Python standard library. It reads every
-conformance file the way the reference reader does, which shows that the specification is enough to
-read the format. Being plain Python, it is also meant to be read, and to be a starting point for
-importing `.bread` into other programs.
+This reader is written from the specification alone,
+[`SPEC.md`](https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md), without the code of
+the reference implementation. It reads every conformance file the way the reference reader does,
+which shows that the specification is enough to read the format. Being plain Python, it is also
+meant to be read, and to be a starting point for importing `.bread` into other programs.
 
-It needs Python 3.14 or later, for `compression.zstd`.
+## Install
+
+```text
+pip install bread-format
+```
+
+It needs Python 3.10 or later. On Python 3.14 and later it uses nothing but the standard library,
+whose `compression.zstd` decompresses the chunks; before 3.14, pip also installs the `zstandard`
+package for that.
 
 ## Use
 
@@ -51,7 +59,7 @@ point.
 Lengths are millimetres, with Z up (SPEC 3.5).
 
 When a file is refused, `read_file` raises `BreadError`, whose `reason` is one of the reason codes
-of [`conformance/README.md`](../conformance/README.md), such as `"crc"` or `"malformed"`, and
+of [`conformance/README.md`](https://github.com/breadslicer-app/bread-format/blob/main/conformance/README.md), such as `"crc"` or `"malformed"`, and
 whose `chunk` names the chunk at fault.
 
 ## Speed
@@ -66,4 +74,5 @@ python -m unittest discover -s tests
 ```
 
 run from this folder with `src` on `PYTHONPATH`, or after `pip install -e .`. They read every file
-in [`conformance/`](../conformance).
+in [`conformance/`](https://github.com/breadslicer-app/bread-format/tree/main/conformance), so they
+run from a clone of the repository.

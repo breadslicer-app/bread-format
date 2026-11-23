@@ -10,21 +10,33 @@ name = "bread-format"
 version = "0.1.0"
 description = "Reads .bread files: triangle meshes kept bit for bit, and the scene that places them."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-dependencies = []
-keywords = ["3d", "mesh", "stl", "3d-printing", "file-format"]
+# Zstandard is in the standard library from Python 3.14 (compression.zstd).
+dependencies = ['zstandard >= 0.23; python_version < "3.14"']
+keywords = ["3d", "mesh", "stl", "3d-printing", "resin", "file-format", "bread"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Topic :: File Formats",
+    "Topic :: Multimedia :: Graphics :: 3D Rendering",
     "Topic :: Multimedia :: Graphics :: 3D Modeling",
 ]
 
 [project.urls]
 Homepage = "https://bread.synrgs.tech"
+Specification = "https://github.com/breadslicer-app/bread-format/blob/main/SPEC.md"
+Source = "https://github.com/breadslicer-app/bread-format/tree/main/python"
+Issues = "https://github.com/breadslicer-app/bread-format/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

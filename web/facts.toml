@@ -313,10 +313,10 @@ date = 2026-11-11
 [facts.second_reader_dependencies]
 value = 0
 unit = "dependencies"
-what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
+what = "what the second reader needs besides the Python standard library, on Python 3.14 or later; before 3.14 (back to 3.10) it also needs the zstandard package"
 source = "python/pyproject.toml"
-derive = "len(toml('python/pyproject.toml')['project'].get('dependencies', []))"
-date = 2026-11-11
+derive = "len([d for d in toml('python/pyproject.toml')['project'].get('dependencies', []) if ';' not in d])"
+date = 2026-11-23
 
 # --- The viewer and converter -----------------------------------------------------
 # notes/viewer.md. Hosted by the page at /viewer/, built from viewer/ on main.
