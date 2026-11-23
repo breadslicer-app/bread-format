@@ -7,12 +7,22 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use bread_cli::Credit;
 use bread_format::{read_file, read_stl};
 
 use super::{
-    Direction, Job, Output, Plan, Way, WhenThere, collect, convert, free_space, make, plan, target,
-    write,
+    Direction, Job, Output, Plan, Stamp, Way, WhenThere, collect, convert, free_space, make, plan,
+    target, title_of, write,
 };
+
+/// What the tests' files are stamped with.
+fn stamp() -> Stamp {
+    Stamp {
+        credit: Credit::default(),
+        created: "2026-11-23T14:30:00Z".into(),
+        generator: "Bread Converter test".into(),
+    }
+}
 
 /// A folder of its own for each test, empty.
 fn scratch(name: &str) -> PathBuf {
@@ -53,7 +63,7 @@ fn tree(name: &str) -> PathBuf {
         way: Way::ToBread,
         size: 134,
     };
-    convert(&a, &root.join("b.bread")).unwrap();
+    convert(&a, &root.join("b.bread"), &stamp()).unwrap();
     root
 }
 
@@ -220,7 +230,7 @@ fn conversions_go_both_ways_and_leave_no_part_behind() {
     };
     for (job, p) in jobs.iter().zip(plan(&jobs, &kept, WhenThere::Skip)) {
         let Plan::Write(to) = p else { panic!("{p:?}") };
-        convert(job, &to).unwrap();
+        convert(job, &to, &stamp()).unwrap();
     }
     let d = read_file(fs::read(out.join("sub/deeper/d.bread")).unwrap().as_slice()).unwrap();
     assert_eq!(d.scene.meshes[0], read_stl(&stl(3.0)).unwrap());
@@ -240,7 +250,7 @@ fn conversions_go_both_ways_and_leave_no_part_behind() {
         way: Way::ToBread,
         size: 10,
     };
-    let err = convert(&job, &out.join("bad.bread")).unwrap_err();
+    let err = convert(&job, &out.join("bad.bread"), &stamp()).unwrap_err();
     assert!(err.contains("not an STL"), "{err}");
     assert!(!out.join("bad.bread").exists());
     assert!(!out.join("bad.bread.part").exists());
@@ -256,14 +266,14 @@ fn a_file_can_be_converted_in_memory_and_written_later() {
         size: 134,
     };
     let before: Vec<_> = walk(&root);
-    let made = make(&job).unwrap();
+    let made = make(&job, &stamp()).unwrap();
     assert_eq!(walk(&root), before, "nothing written");
     let file = read_file(made.as_slice()).unwrap();
     assert_eq!(file.scene.meshes[0], read_stl(&stl(0.0)).unwrap());
 
     // Written later, it is what converting writes.
     write(&made, &root.join("later/a.bread")).unwrap();
-    convert(&job, &root.join("now.bread")).unwrap();
+    convert(&job, &root.join("now.bread"), &stamp()).unwrap();
     assert_eq!(
         fs::read(root.join("later/a.bread")).unwrap(),
         fs::read(root.join("now.bread")).unwrap()
@@ -272,6 +282,46 @@ fn a_file_can_be_converted_in_memory_and_written_later() {
     // Room is asked where a folder is, or would be.
     assert!(free_space(&root).is_some_and(|n| n > 0));
     assert_eq!(free_space(&root.join("not/yet/there")), free_space(&root));
+}
+
+#[test]
+fn every_bread_file_of_a_batch_carries_its_credit() {
+    let root = tree("credit");
+    let job = Job {
+        source: root.join("a.stl"),
+        root: None,
+        way: Way::ToBread,
+        size: 134,
+    };
+    assert_eq!(title_of(&job.source), "a");
+    let stamp = Stamp {
+        credit: Credit {
+            title: Some("A dragon".into()),
+            designer: Some("A. Designer".into()),
+            license: Some("CC-BY-NC-4.0".into()),
+            source: Some("https://example.com/dragon".into()),
+        },
+        ..stamp()
+    };
+    let out = root.join("credited.bread");
+    convert(&job, &out, &stamp).unwrap();
+    let file = read_file(fs::read(&out).unwrap().as_slice()).unwrap();
+    let entries: Vec<_> = file
+        .metadata
+        .iter()
+        .map(|e| (e.node, e.key.as_str(), e.as_text().unwrap()))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            (None, "title", "A dragon"),
+            (None, "designer", "A. Designer"),
+            (None, "license", "CC-BY-NC-4.0"),
+            (None, "source", "https://example.com/dragon"),
+            (None, "created", "2026-11-23T14:30:00Z"),
+            (None, "generator", "Bread Converter test"),
+        ]
+    );
 }
 
 fn walk(dir: &Path) -> Vec<PathBuf> {

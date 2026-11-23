@@ -33,6 +33,8 @@ export struct JobRow {
     // 0 waiting, 1 converting, 2 done, 3 skipped, 4 failed, 5 converted in
     // memory only, ready to export.
     state: int,
+    // The title its .bread file gets, for a file going to .bread.
+    title: string,
 }
 
 // A column title of the list.
@@ -56,11 +58,21 @@ component Cell inherits Text {
 component Row inherits Rectangle {
     in property <JobRow> job;
     in property <bool> odd;
+    // Whether a click changes its title.
+    in property <bool> editable;
+    callback clicked();
 
     height: 42px;
     background: touch.has-hover ? Theme.hover : self.odd ? Theme.card : transparent;
 
-    touch := TouchArea { }
+    touch := TouchArea {
+        mouse-cursor: root.editable ? MouseCursor.pointer : MouseCursor.default;
+        clicked => {
+            if root.editable {
+                root.clicked();
+            }
+        }
+    }
 
     HorizontalLayout {
         padding-left: 14px;
@@ -91,6 +103,7 @@ component Row inherits Rectangle {
                 text: root.job.reason == 1 ? @tr("Already there: {}", root.job.detail)
                     : root.job.reason == 2 ? @tr("Not converted this way")
                     : root.job.reason == 4 ? @tr("→ {}", root.job.detail)
+                    : root.job.title != "" ? @tr("“{}” · {}", root.job.title, root.job.detail)
                     : root.job.detail;
                 font-size: Theme.font-xs;
                 color: root.job.state == 4 ? Theme.danger
@@ -167,7 +180,8 @@ export component AppWindow inherits Window {
     // 0 nothing run yet, 1 converting, 2 done, 3 stopped, 4 converted in
     // memory only.
     in property <int> phase;
-    // Something to say instead: 1 nothing found to add, 2 no output folder.
+    // Something to say instead: 1 nothing found to add, 2 no output folder,
+    // 3 a credit that cannot be written (`credit-problem`).
     in property <int> notice;
     in property <int> file-count;
     in property <string> file-size;
@@ -198,7 +212,8 @@ export component AppWindow inherits Window {
 
     property <string> files-text: @tr("{n} file" | "{n} files" % root.file-count);
     property <string> outcome-text: @tr("{} converted, {} skipped, {} failed", root.converted, root.skipped, root.failed);
-    property <string> status-text: root.notice == 1 ? @tr("Nothing to add there: no STL or .bread files.")
+    property <string> status-text: root.notice == 3 ? root.credit-problem
+        : root.notice == 1 ? @tr("Nothing to add there: no STL or .bread files.")
         : root.notice == 2 ? @tr("Choose the folder to write into.")
         : root.phase == 1 ? @tr("Converting {} of {}: {} of {}, {}", Math.min(root.done-count + 1, root.run-count), root.run-count, root.bytes-done, root.file-size, root.elapsed)
         : root.phase == 2 ? @tr("Done in {}: {}", root.elapsed, root.outcome-text)
@@ -217,6 +232,16 @@ export component AppWindow inherits Window {
     in-out property <bool> about-open;
     // 0 English, 1 Spanish.
     in-out property <int> language;
+    // The credit written into every .bread file, and why it cannot be, if
+    // it cannot.
+    in-out property <string> designer;
+    in-out property <string> license;
+    in-out property <string> source;
+    in property <string> credit-problem;
+    // The file whose title is being changed, or -1; its name, and the title.
+    in-out property <int> title-row: -1;
+    in property <string> title-file;
+    in-out property <string> title-text;
 
     callback add-files();
     callback add-folder();
@@ -229,6 +254,10 @@ export component AppWindow inherits Window {
     callback settings-changed();
     callback open-url(string);
     callback language-picked(int);
+    callback credit-changed();
+    callback edit-title(int);
+    callback title-done(int, string);
+    callback title-reset(int);
 
     VerticalLayout {
         // The top bar.
@@ -413,6 +442,55 @@ export component AppWindow inherits Window {
                             }
                         }
 
+                        if root.direction != 2: Card {
+                            title: @tr("CREDIT");
+
+                            ScLineEdit {
+                                text <=> root.designer;
+                                placeholder-text: @tr("Designer");
+                                enabled: !root.busy;
+                                edited => {
+                                    root.credit-changed();
+                                }
+                            }
+                            ScLineEdit {
+                                text <=> root.license;
+                                placeholder-text: @tr("License, such as CC-BY-4.0");
+                                enabled: !root.busy;
+                                edited => {
+                                    root.credit-changed();
+                                }
+                            }
+                            for line in [["CC-BY-4.0", "CC-BY-NC-4.0"], ["CC-BY-NC-SA-4.0", "CC0-1.0"]]: HorizontalLayout {
+                                spacing: 4px;
+                                for id in line: ScButton {
+                                    kind: ButtonKind.ghost;
+                                    text: id;
+                                    button-height: 22px;
+                                    enabled: !root.busy;
+                                    horizontal-stretch: 1;
+                                    clicked => {
+                                        root.license = id;
+                                        root.credit-changed();
+                                    }
+                                }
+                            }
+                            ScLineEdit {
+                                text <=> root.source;
+                                placeholder-text: @tr("Where they come from: https://…");
+                                enabled: !root.busy;
+                                edited => {
+                                    root.credit-changed();
+                                }
+                            }
+                            if root.credit-problem != "": WarningNote {
+                                text: root.credit-problem;
+                            }
+                            Note {
+                                text: @tr("Written into every .bread file, with the file's name as its title: click a file to change it. What is left empty is not written.");
+                            }
+                        }
+
                         Card {
                             title: @tr("EXPORT");
 
@@ -578,6 +656,10 @@ export component AppWindow inherits Window {
                         for job[i] in root.jobs: Row {
                             job: job;
                             odd: Math.mod(i, 2) == 1;
+                            editable: !root.busy && job.way == "STL → .bread";
+                            clicked => {
+                                root.edit-title(i);
+                            }
                         }
                     }
 
@@ -781,6 +863,81 @@ export component AppWindow inherits Window {
             pointer-event(event) => {
                 if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
                     root.window-resize(side.d);
+                }
+            }
+        }
+    }
+
+    // A file's title, over the window.
+    if root.title-row >= 0: Rectangle {
+        background: #000000a0;
+
+        TouchArea {
+            clicked => {
+                root.title-row = -1;
+            }
+        }
+
+        Rectangle {
+            width: 440px;
+            height: titled.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Theme.chrome;
+            border-width: 1px;
+            border-color: Theme.border-strong;
+            border-radius: Theme.radius-lg;
+
+            TouchArea { }
+
+            titled := VerticalLayout {
+                padding: 18px;
+                spacing: 12px;
+
+                DialogHead {
+                    icon: Icons.logo;
+                    tint: Theme.brand;
+                    title: @tr("Title");
+                    subtitle: root.title-file;
+                    close-label: @tr("Close");
+                    close => {
+                        root.title-row = -1;
+                    }
+                }
+                DialogRule { }
+                ScLineEdit {
+                    text <=> root.title-text;
+                    init => {
+                        self.focus();
+                    }
+                    accepted => {
+                        root.title-done(root.title-row, root.title-text);
+                        root.title-row = -1;
+                    }
+                }
+                Note {
+                    text: @tr("The title written into this file's .bread. Left empty, it has none.");
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    ScButton {
+                        text: @tr("From the file's name");
+                        clicked => {
+                            root.title-reset(root.title-row);
+                            root.title-row = -1;
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                    ScButton {
+                        kind: ButtonKind.primary;
+                        text: @tr("OK");
+                        clicked => {
+                            root.title-done(root.title-row, root.title-text);
+                            root.title-row = -1;
+                        }
+                    }
                 }
             }
         }

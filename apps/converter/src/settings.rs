@@ -24,6 +24,11 @@ pub struct Settings {
     pub last_folder: String,
     /// "en" or "es", or empty for the system's.
     pub language: String,
+    /// The credit written into every `.bread` file: who designed the
+    /// models, their license and where they come from. Empty for none.
+    pub designer: String,
+    pub license: String,
+    pub source: String,
 }
 
 impl Default for Settings {
@@ -38,6 +43,9 @@ impl Default for Settings {
             export_mode: 0,
             last_folder: String::new(),
             language: String::new(),
+            designer: String::new(),
+            license: String::new(),
+            source: String::new(),
         }
     }
 }
@@ -72,6 +80,9 @@ impl Settings {
                 "when_there" => s.when_there = choice(2).unwrap_or(s.when_there),
                 "export_mode" => s.export_mode = choice(1).unwrap_or(s.export_mode),
                 "last_folder" => s.last_folder = value.to_owned(),
+                "designer" => s.designer = value.to_owned(),
+                "license" => s.license = value.to_owned(),
+                "source" => s.source = value.to_owned(),
                 "language" if matches!(value.trim(), "en" | "es") => {
                     s.language = value.trim().to_owned();
                 }
@@ -84,7 +95,7 @@ impl Settings {
     pub fn text(&self) -> String {
         let one_line = |v: &str| v.replace(['\r', '\n'], "");
         format!(
-            "direction={}\nsubfolders={}\noutput_mode={}\noutput_folder={}\nkeep_tree={}\nwhen_there={}\nexport_mode={}\nlast_folder={}\nlanguage={}\n",
+            "direction={}\nsubfolders={}\noutput_mode={}\noutput_folder={}\nkeep_tree={}\nwhen_there={}\nexport_mode={}\nlast_folder={}\nlanguage={}\ndesigner={}\nlicense={}\nsource={}\n",
             self.direction,
             self.subfolders,
             self.output_mode,
@@ -94,6 +105,9 @@ impl Settings {
             self.export_mode,
             one_line(&self.last_folder),
             self.language,
+            one_line(&self.designer),
+            one_line(&self.license),
+            one_line(&self.source),
         )
     }
 
@@ -149,6 +163,9 @@ mod tests {
             export_mode: 1,
             last_folder: "C:/models".into(),
             language: "es".into(),
+            designer: "A. Designer = me".into(),
+            license: "CC-BY-4.0".into(),
+            source: "https://example.com/models?a=b".into(),
         };
         assert_eq!(Settings::parse(&s.text()), s);
     }

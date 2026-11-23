@@ -18,7 +18,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use bread_converter::queue::{self, Direction, Job, Output, Plan, Way, WhenThere};
+use bread_cli::Credit;
+use bread_converter::queue::{self, Direction, Job, Output, Plan, Stamp, Way, WhenThere};
 use bread_converter::settings::Settings;
 use slint::winit_030::winit::window::ResizeDirection;
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
@@ -73,6 +74,8 @@ struct App {
     made: Vec<Option<Made>>,
     /// The folder to open after a run.
     last_output: Option<PathBuf>,
+    /// Each file's title, when it was changed from its name's.
+    titles: Vec<Option<String>>,
 }
 
 thread_local! {
@@ -107,6 +110,10 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.set_keep_tree(settings.keep_tree);
     ui.set_when_there(settings.when_there);
     ui.set_export_mode(settings.export_mode);
+    ui.set_designer(settings.designer.clone().into());
+    ui.set_license(settings.license.clone().into());
+    ui.set_source(settings.source.clone().into());
+    ui.set_credit_problem(credit_problem(&ui).into());
     let rows = Rc::new(VecModel::<JobRow>::default());
     ui.set_jobs(ModelRc::from(rows.clone()));
     APP.with(|a| {
@@ -118,6 +125,7 @@ fn main() -> Result<(), slint::PlatformError> {
             run: None,
             made: Vec::new(),
             last_output: None,
+            titles: Vec::new(),
         });
     });
 
@@ -177,6 +185,18 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.on_open_url(|url| open(url.as_str().as_ref()));
     ui.on_settings_changed(|| {
         app(App::save);
+    });
+    ui.on_credit_changed(|| {
+        app(App::credit_changed);
+    });
+    ui.on_edit_title(|i| {
+        app(|a| a.edit_title(i));
+    });
+    ui.on_title_done(|i, text| {
+        app(|a| a.set_title(i, Some(text.to_string())));
+    });
+    ui.on_title_reset(|i| {
+        app(|a| a.set_title(i, None));
     });
     ui.on_language_picked(|i| {
         let language = if i == 1 { "es" } else { "en" };
@@ -373,7 +393,23 @@ fn folder_of(job: &Job) -> String {
         .into_owned()
 }
 
-fn row(job: &Job) -> JobRow {
+/// The credit the window shows, without its title.
+fn credit_of(ui: &AppWindow) -> Credit {
+    Credit {
+        title: None,
+        designer: Some(ui.get_designer().to_string()),
+        license: Some(ui.get_license().to_string()),
+        source: Some(ui.get_source().to_string()),
+    }
+    .tidy()
+}
+
+/// Why the credit the window shows cannot be written, or nothing.
+fn credit_problem(ui: &AppWindow) -> String {
+    credit_of(ui).check().err().map(|e| e.0).unwrap_or_default()
+}
+
+fn row(job: &Job, title: &str) -> JobRow {
     JobRow {
         name: job
             .source
@@ -388,6 +424,11 @@ fn row(job: &Job) -> JobRow {
         result: SharedString::new(),
         ratio: SharedString::new(),
         state: 0,
+        title: if job.way == Way::ToBread {
+            title.into()
+        } else {
+            SharedString::new()
+        },
     }
 }
 
@@ -420,6 +461,8 @@ struct Work {
     job: Job,
     out: Option<PathBuf>,
     kept: Option<Arc<Vec<u8>>>,
+    /// What its `.bread` file carries.
+    stamp: Stamp,
 }
 
 /// How a file of a run ended: the size made, where it went, and what is kept
@@ -466,9 +509,10 @@ impl App {
             self.forget(&ui);
         }
         for job in new {
-            self.rows.push(row(&job));
+            self.rows.push(row(&job, &queue::title_of(&job.source)));
             self.jobs.push(job);
             self.made.push(None);
+            self.titles.push(None);
         }
         self.show_count(&ui);
     }
@@ -490,7 +534,77 @@ impl App {
 
     fn reset_rows(&self) {
         for (i, job) in self.jobs.iter().enumerate() {
-            self.rows.set_row_data(i, row(job));
+            self.rows.set_row_data(i, row(job, &self.title(i)));
+        }
+    }
+
+    /// The title of the file at `i`: as changed, or its name's.
+    fn title(&self, i: usize) -> String {
+        match self.titles.get(i) {
+            Some(Some(title)) => title.clone(),
+            _ => queue::title_of(&self.jobs[i].source),
+        }
+    }
+
+    /// The credit changed: kept, and what a measuring run made with the old
+    /// one is forgotten, since it would be written with the new one.
+    fn credit_changed(&mut self) {
+        let Some(ui) = self.ui.upgrade() else {
+            return;
+        };
+        ui.set_credit_problem(credit_problem(&ui).into());
+        if ui.get_notice() == 3 {
+            ui.set_notice(0);
+        }
+        if ui.get_can_export() {
+            self.forget(&ui);
+        }
+        self.save();
+    }
+
+    /// Opens the title of the file at `i` to be changed.
+    fn edit_title(&self, i: i32) {
+        let Some(ui) = self.ui.upgrade() else {
+            return;
+        };
+        let Some(job) = usize::try_from(i).ok().and_then(|i| self.jobs.get(i)) else {
+            return;
+        };
+        if self.run.is_some() || job.way != Way::ToBread {
+            return;
+        }
+        let i = usize::try_from(i).unwrap_or_default();
+        ui.set_title_file(
+            job.source
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default()
+                .into(),
+        );
+        ui.set_title_text(self.title(i).into());
+        ui.set_title_row(i32::try_from(i).unwrap_or(-1));
+    }
+
+    /// Gives the file at `i` a title, or its name's back with `None`.
+    fn set_title(&mut self, i: i32, title: Option<String>) {
+        let Some(i) = usize::try_from(i).ok().filter(|&i| i < self.jobs.len()) else {
+            return;
+        };
+        if self.run.is_some() {
+            return;
+        }
+        self.titles[i] = title;
+        if let Some(ui) = self.ui.upgrade() {
+            if ui.get_notice() == 3 {
+                ui.set_notice(0);
+            }
+            if ui.get_can_export() {
+                self.forget(&ui);
+            }
+        }
+        if let Some(mut r) = self.rows.row_data(i) {
+            r.title = self.title(i).into();
+            self.rows.set_row_data(i, r);
         }
     }
 
@@ -500,6 +614,7 @@ impl App {
         }
         self.jobs.clear();
         self.made.clear();
+        self.titles.clear();
         self.rows.set_vec(Vec::new());
         if let Some(ui) = self.ui.upgrade() {
             self.forget(&ui);
@@ -519,6 +634,9 @@ impl App {
         self.settings.keep_tree = ui.get_keep_tree();
         self.settings.when_there = ui.get_when_there();
         self.settings.export_mode = ui.get_export_mode();
+        self.settings.designer = ui.get_designer().to_string();
+        self.settings.license = ui.get_license().to_string();
+        self.settings.source = ui.get_source().to_string();
         self.settings.save();
         if ui.get_can_export() {
             self.show_room(&ui);
@@ -574,6 +692,46 @@ impl App {
         let wanted: Vec<usize> = (0..self.jobs.len())
             .filter(|&i| this_way(i) && (kind != Kind::Export || self.made[i].is_some()))
             .collect();
+        // Every .bread file carries the credit: what cannot be written is
+        // said before anything is converted.
+        let base = Stamp {
+            credit: credit_of(&ui),
+            created: bread_cli::now(),
+            generator: format!("Bread Converter {}", env!("CARGO_PKG_VERSION")),
+        };
+        let stamp_of = |i: usize| -> Result<Stamp, String> {
+            let credit = Credit {
+                title: Some(self.title(i)),
+                ..base.credit.clone()
+            }
+            .tidy();
+            credit.check().map_err(|e| {
+                if base.credit.check().is_err() {
+                    e.0
+                } else {
+                    format!("{}: {}", self.jobs[i].source.display(), e.0)
+                }
+            })?;
+            Ok(Stamp {
+                credit,
+                ..base.clone()
+            })
+        };
+        let mut stamps = Vec::with_capacity(wanted.len());
+        for &i in &wanted {
+            if self.jobs[i].way == Way::ToBread {
+                match stamp_of(i) {
+                    Ok(stamp) => stamps.push(stamp),
+                    Err(problem) => {
+                        ui.set_credit_problem(problem.into());
+                        ui.set_notice(3);
+                        return;
+                    }
+                }
+            } else {
+                stamps.push(base.clone());
+            }
+        }
         let plans = match &output {
             Some(output) => {
                 let chosen: Vec<Job> = wanted.iter().map(|&i| self.jobs[i].clone()).collect();
@@ -585,7 +743,7 @@ impl App {
         let mut tally = Tally::default();
         let mut work = Vec::new();
         for (i, job) in self.jobs.iter().enumerate() {
-            let mut r = row(job);
+            let mut r = row(job, &self.title(i));
             let Some(k) = wanted.iter().position(|&w| w == i) else {
                 // A file that failed when it was converted in memory keeps
                 // saying why.
@@ -604,6 +762,7 @@ impl App {
                     job: job.clone(),
                     out: None,
                     kept: None,
+                    stamp: stamps[k].clone(),
                 }),
                 Some(Plan::Skip(there)) => {
                     r.state = 3;
@@ -623,6 +782,7 @@ impl App {
                     job: job.clone(),
                     out: Some(out.clone()),
                     kept: self.made[i].as_ref().and_then(|m| m.bytes.clone()),
+                    stamp: stamps[k].clone(),
                 }),
             }
             self.rows.set_row_data(i, r);
@@ -796,7 +956,7 @@ fn convert_all(work: Vec<Work>, kind: Kind, stop: &AtomicBool, tally: &Mutex<Tal
                         app(|a| a.started(i));
                     });
                     let outcome: Outcome = match (&w.out, &w.kept) {
-                        (None, _) => queue::make(&w.job).map(|bytes| {
+                        (None, _) => queue::make(&w.job, &w.stamp).map(|bytes| {
                             let n = bytes.len() as u64;
                             let fits =
                                 kept_bytes.fetch_add(n, Ordering::Relaxed) + n <= KEEP_IN_MEMORY;
@@ -807,9 +967,8 @@ fn convert_all(work: Vec<Work>, kind: Kind, stop: &AtomicBool, tally: &Mutex<Tal
                         }),
                         (Some(out), Some(bytes)) => queue::write(bytes, out)
                             .map(|()| (bytes.len() as u64, Some(out.clone()), None)),
-                        (Some(out), None) => {
-                            queue::convert(&w.job, out).map(|n| (n, Some(out.clone()), None))
-                        }
+                        (Some(out), None) => queue::convert(&w.job, out, &w.stamp)
+                            .map(|n| (n, Some(out.clone()), None)),
                     };
                     debug_assert!(kind == Kind::Measure || w.out.is_some());
                     {
