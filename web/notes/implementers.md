@@ -16,7 +16,7 @@ https://github.com/breadslicer-app/bread-format, under Apache-2.0:
 
 ```toml
 [dependencies]
-bread-format = "0.4"
+bread-format = "0.5"
 ```
 
 ```rust
