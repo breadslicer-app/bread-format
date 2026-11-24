@@ -23,9 +23,9 @@ version = "0.5.0"               # of the reference implementation, tag v0.5.0
 released = 2026-11-21
 earlier_versions = [{ version = "0.4.0", released = 2026-11-18 }, { version = "0.3.0", released = 2026-11-11 }, { version = "0.2.0", released = 2026-11-11 }, { version = "0.1.0", released = 2026-10-30 }]
 crate = "https://crates.io/crates/bread-format"       # 0.4.0, the first release there, 2026-11-18
-crate_version = "0.4.0"         # the newest release on crates.io; `version` above is the newest tag
+crate_version = "0.5.0"         # the newest release on crates.io; `version` above is the newest tag
 js_package = "https://www.npmjs.com/package/bread-format"   # bread-format 0.1.0 on npm, 2026-11-18
-js_package_version = "0.1.0"
+js_package_version = "0.2.0"
 python_package = "none"         # python/ is not on PyPI
 units = "millimetres; right-handed axes, Z up, XY is the build plate"
 

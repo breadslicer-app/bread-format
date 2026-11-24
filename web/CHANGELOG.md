@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-11-24, crate 0.5.0 and JavaScript package 0.2.0 published
+
+- `[project] crate_version` is 0.5.0 and `js_package_version` 0.2.0: both are now on crates.io
+  and npm, with the roles and metadata chunks of the specification's version 2.
+- `README.md` and `notes/implementers.md`: the Cargo.toml snippet asks for `"0.5"`.
+
 ## 2026-11-21, the crate's version on crates.io
 
 - New fact, `[project] crate_version`: 0.4.0, the newest release of the crate on crates.io, for

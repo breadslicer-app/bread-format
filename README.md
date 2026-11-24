@@ -89,7 +89,7 @@ on a package registry.
 
 ```toml
 [dependencies]
-bread-format = "0.4"
+bread-format = "0.5"
 ```
 
 ```rust
