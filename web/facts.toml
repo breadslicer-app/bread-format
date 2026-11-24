@@ -22,11 +22,12 @@ reference_implementation = "bread-format, a Rust crate, also built to WebAssembl
 version = "0.5.0"               # of the reference implementation, tag v0.5.0
 released = 2026-11-21
 earlier_versions = [{ version = "0.4.0", released = 2026-11-18 }, { version = "0.3.0", released = 2026-11-11 }, { version = "0.2.0", released = 2026-11-11 }, { version = "0.1.0", released = 2026-10-30 }]
-crate = "https://crates.io/crates/bread-format"       # 0.4.0, the first release there, 2026-11-18
+crate = "https://crates.io/crates/bread-format"       # first release there 0.4.0, 2026-11-18; 0.5.0 on 2026-11-24
 crate_version = "0.5.0"         # the newest release on crates.io; `version` above is the newest tag
-js_package = "https://www.npmjs.com/package/bread-format"   # bread-format 0.1.0 on npm, 2026-11-18
+js_package = "https://www.npmjs.com/package/bread-format"   # first release 0.1.0, 2026-11-18; 0.2.0 on 2026-11-24
 js_package_version = "0.2.0"
-python_package = "none"         # python/ is not on PyPI
+python_package = "https://pypi.org/project/bread-format/"   # python/, 0.1.0 on 2026-11-24
+python_package_version = "0.1.0"
 units = "millimetres; right-handed axes, Z up, XY is the build plate"
 
 # --- The 1.9 M triangle figure ---------------------------------------------
@@ -313,10 +314,10 @@ date = 2026-11-11
 [facts.second_reader_dependencies]
 value = 0
 unit = "dependencies"
-what = "what the second reader needs besides the Python standard library (Python 3.14 or later)"
+what = "what the second reader needs besides the Python standard library, on Python 3.14 or later; before 3.14 (back to 3.10) it also needs the zstandard package"
 source = "python/pyproject.toml"
-derive = "len(toml('python/pyproject.toml')['project'].get('dependencies', []))"
-date = 2026-11-11
+derive = "len([d for d in toml('python/pyproject.toml')['project'].get('dependencies', []) if ';' not in d])"
+date = 2026-11-23
 
 # --- The viewer and converter -----------------------------------------------------
 # notes/viewer.md. Hosted by the page at /viewer/, built from viewer/ on main.

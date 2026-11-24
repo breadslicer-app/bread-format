@@ -40,7 +40,7 @@ The first three are details the published meshoptimizer bitstream leaves to its 
 While checking the fifth, the reference implementation itself turned out to accept a file of
 container version 0. It now refuses one, and a conformance file tests it.
 
-**What it is for.** It is plain Python with nothing but the standard library (Python 3.14 or later),
-written to be read. That makes it a starting point for importing `.bread` into other programs, many
+**What it is for.** It is plain Python with nothing but the standard library on Python 3.14 or
+later (on 3.10 to 3.13 it also needs the `zstandard` package), written to be read. That makes it a starting point for importing `.bread` into other programs, many
 of which take plug-ins in Python. It favours being clear over being fast: the 1.97 M triangle mesh
 takes about half a minute, where the reference implementation takes a fraction of a second.

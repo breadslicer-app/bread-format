@@ -83,9 +83,9 @@ not know, so programs can keep data of their own beside the official chunks.
 | [`viewer/`](viewer) | The viewer and converter at [bread.synrgs.tech/viewer](https://bread.synrgs.tech/viewer/). |
 | [`tools/corpus-bench`](tools/corpus-bench) | Measures `.bread` on a folder of STL files. |
 
-The crate is on [crates.io](https://crates.io/crates/bread-format) and the JavaScript package on
-[npm](https://www.npmjs.com/package/bread-format), both as `bread-format`. The Python reader is not
-on a package registry.
+The crate is on [crates.io](https://crates.io/crates/bread-format), the JavaScript package on
+[npm](https://www.npmjs.com/package/bread-format) and the Python reader on
+[PyPI](https://pypi.org/project/bread-format/), all three as `bread-format`.
 
 ```toml
 [dependencies]

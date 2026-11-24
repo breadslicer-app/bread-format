@@ -2,11 +2,19 @@
 
 Newest first.
 
-## 2026-11-24, crate 0.5.0 and JavaScript package 0.2.0 published
+## 2026-11-24, published: crate 0.5.0, JavaScript package 0.2.0 and the Python package 0.1.0
 
 - `[project] crate_version` is 0.5.0 and `js_package_version` 0.2.0: both are now on crates.io
   and npm, with the roles and metadata chunks of the specification's version 2.
+- `[project] python_package` is the Python reader on PyPI, `bread-format` 0.1.0, and the new
+  `python_package_version` is 0.1.0 (#162).
 - `README.md` and `notes/implementers.md`: the Cargo.toml snippet asks for `"0.5"`.
+
+## 2026-11-23, the Python reader from Python 3.10
+
+- `second_reader_dependencies` stays 0, now counted on Python 3.14 or later: the reader runs on
+  Python 3.10 and later, and before 3.14 it also needs the `zstandard` package, which pip installs
+  with it. `notes/second-reader.md` says so. It is still not on PyPI (#162).
 
 ## 2026-11-21, the crate's version on crates.io
 
