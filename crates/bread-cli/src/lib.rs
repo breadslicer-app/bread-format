@@ -11,8 +11,12 @@ use std::collections::HashMap;
 use std::fmt;
 
 use bread_format::{
-    BreadFile, BreadReader, Mesh, Meta, Node, NodeKind, Scene, read_file, read_stl, write_file,
+    BreadFile, BreadReader, Mesh, Meta, MetadataEntry, Node, NodeKind, Scene, read_file, read_stl,
+    write_file,
 };
+
+mod credit;
+pub use credit::{Credit, now};
 
 /// Why something could not be done, said for a person.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,6 +54,17 @@ pub struct Part {
 /// be the one read from its STL, and every corner of a binary STL the STL's
 /// own bytes, all bit for bit.
 pub fn from_stl(files: &[StlFile], name: Option<&str>) -> Result<(Vec<u8>, Vec<Part>), Error> {
+    from_stl_with(files, name, Vec::new())
+}
+
+/// [`from_stl`], with `metadata` (`SPEC.md` 12) written into the file, such
+/// as a [`Credit`]'s. It is checked on the way back too: the file must read
+/// back with every entry as given.
+pub fn from_stl_with(
+    files: &[StlFile],
+    name: Option<&str>,
+    metadata: Vec<MetadataEntry>,
+) -> Result<(Vec<u8>, Vec<Part>), Error> {
     if files.is_empty() {
         return Err(Error("no STL file to convert".into()));
     }
@@ -79,6 +94,7 @@ pub fn from_stl(files: &[StlFile], name: Option<&str>) -> Result<(Vec<u8>, Vec<P
     };
     let file = BreadFile {
         scene,
+        metadata,
         ..BreadFile::default()
     };
     let bytes = write_file(&file, Vec::new())
@@ -98,6 +114,11 @@ pub fn from_stl(files: &[StlFile], name: Option<&str>) -> Result<(Vec<u8>, Vec<P
             .iter()
             .zip(&back.scene.meshes)
             .all(|(f, m)| same_as_binary_stl(m, &f.bytes) != Some(false));
+    if back.metadata != file.metadata {
+        return Err(Error(
+            "the .bread file does not give back the metadata written into it".into(),
+        ));
+    }
     if !same {
         return Err(Error(
             "the .bread file does not give back every corner of the STL files".into(),

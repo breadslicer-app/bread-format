@@ -11,7 +11,7 @@ use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use bread_cli::{StlFile, from_stl, to_stl};
+use bread_cli::{Credit, StlFile, from_stl_with, to_stl};
 use bread_format::read_file;
 
 /// Which way a file goes.
@@ -29,6 +29,23 @@ impl Way {
             Self::ToStl => "stl",
         }
     }
+}
+
+/// What a run writes into each `.bread` file it makes (`SPEC.md` 12): the
+/// file's credit, its title among it, and the program and the time.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Stamp {
+    pub credit: Credit,
+    pub created: String,
+    pub generator: String,
+}
+
+/// The title a file is given unless it is changed: its name, without the
+/// extension.
+pub fn title_of(path: &Path) -> String {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Which files are converted.
@@ -219,8 +236,9 @@ fn beside(path: &Path, free: impl Fn(&Path) -> bool) -> PathBuf {
 }
 
 /// Converts `job` in memory, checked as `bread from-stl` and `bread to-stl`
-/// check it, and gives what it makes, without writing anything.
-pub fn make(job: &Job) -> Result<Vec<u8>, String> {
+/// check it, and gives what it makes, without writing anything. A `.bread`
+/// file carries `stamp`.
+pub fn make(job: &Job, stamp: &Stamp) -> Result<Vec<u8>, String> {
     let bytes = fs::read(&job.source).map_err(|e| format!("cannot read it: {e}"))?;
     match job.way {
         Way::ToBread => {
@@ -229,7 +247,8 @@ pub fn make(job: &Job) -> Result<Vec<u8>, String> {
                 .file_name()
                 .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
             let prefix = format!("{name}: ");
-            Ok(from_stl(&[StlFile { name, bytes }], None)
+            let metadata = stamp.credit.metadata(&stamp.created, &stamp.generator);
+            Ok(from_stl_with(&[StlFile { name, bytes }], None, metadata)
                 .map_err(|e| e.0.strip_prefix(&prefix).unwrap_or(&e.0).to_owned())?
                 .0)
         }
@@ -269,8 +288,8 @@ pub fn write(bytes: &[u8], out: &Path) -> Result<(), String> {
 
 /// Converts `job` into `out`, as [`make`] and [`write`] do. Gives the size
 /// written.
-pub fn convert(job: &Job, out: &Path) -> Result<u64, String> {
-    let made = make(job)?;
+pub fn convert(job: &Job, out: &Path, stamp: &Stamp) -> Result<u64, String> {
+    let made = make(job, stamp)?;
     write(&made, out)?;
     Ok(made.len() as u64)
 }

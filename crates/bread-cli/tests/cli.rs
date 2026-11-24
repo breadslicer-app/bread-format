@@ -177,3 +177,91 @@ fn wrong_arguments_say_how() {
     assert!(help.status.success());
     assert!(text(&help).contains("from-stl"));
 }
+
+#[test]
+fn from_stl_writes_the_credit_as_metadata() {
+    let dir = scratch("credit");
+    let cube = conformance("valid")
+        .into_iter()
+        .find(|p| p.ends_with("cube.bread"))
+        .unwrap();
+    let stl = dir.join("cube.stl");
+    let out = bread(&[
+        "to-stl".as_ref(),
+        cube.as_os_str(),
+        "-o".as_ref(),
+        stl.as_os_str(),
+    ]);
+    assert!(out.status.success(), "{}", text(&out));
+
+    let credited = dir.join("credited.bread");
+    let out = Command::new(BREAD)
+        .args(["from-stl".as_ref(), stl.as_os_str(), "-o".as_ref()])
+        .arg(&credited)
+        .args([
+            "--title",
+            " A cube ",
+            "--designer",
+            "A. Designer",
+            "--license",
+            "CC-BY-4.0",
+            "--source",
+            "https://example.com/cube",
+        ])
+        .env("SOURCE_DATE_EPOCH", "1795444200")
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    let file = bread_format::read_file(fs::read(&credited).unwrap().as_slice()).unwrap();
+    let entries: Vec<_> = file
+        .metadata
+        .iter()
+        .map(|e| (e.node, e.key.as_str(), e.as_text().unwrap()))
+        .collect();
+    let version = format!("bread {}", env!("CARGO_PKG_VERSION"));
+    assert_eq!(
+        entries,
+        [
+            (None, "title", "A cube"),
+            (None, "designer", "A. Designer"),
+            (None, "license", "CC-BY-4.0"),
+            (None, "source", "https://example.com/cube"),
+            (None, "created", "2026-11-23T14:30:00Z"),
+            (None, "generator", version.as_str()),
+        ]
+    );
+
+    // Without credit, the file still says what wrote it, and when.
+    let plain = dir.join("plain.bread");
+    let out = bread(&[
+        "from-stl".as_ref(),
+        stl.as_os_str(),
+        "-o".as_ref(),
+        plain.as_os_str(),
+    ]);
+    assert!(out.status.success(), "{}", text(&out));
+    let file = bread_format::read_file(fs::read(&plain).unwrap().as_slice()).unwrap();
+    let keys: Vec<_> = file.metadata.iter().map(|e| e.key.as_str()).collect();
+    assert_eq!(keys, ["created", "generator"]);
+
+    // What cannot be written is said before anything is converted.
+    let refused = dir.join("refused.bread");
+    for (flag, value) in [("--source", "example.com/cube"), ("--title", "two\nlines")] {
+        let out = Command::new(BREAD)
+            .args(["from-stl".as_ref(), stl.as_os_str(), "-o".as_ref()])
+            .arg(&refused)
+            .args([flag, value])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2), "{flag}: {}", text(&out));
+        assert!(!refused.exists());
+    }
+    // And credit is for from-stl only.
+    let out = bread(&[
+        "to-stl".as_ref(),
+        credited.as_os_str(),
+        "--designer".as_ref(),
+        "A. Designer".as_ref(),
+    ]);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+}

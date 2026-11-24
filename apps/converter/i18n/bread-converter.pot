@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2026-11-15 07:39+0000\n"
+"POT-Creation-Date: 2026-11-23 18:17+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -12,391 +12,443 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: ui/app.slint:91
+#: ui/app.slint:103
 msgctxt "Row"
 msgid "Already there: {}"
 msgstr ""
 
-#: ui/app.slint:92
+#: ui/app.slint:104
 msgctxt "Row"
 msgid "Not converted this way"
 msgstr ""
 
-#: ui/app.slint:93
+#: ui/app.slint:105
 msgctxt "Row"
 msgid "→ {}"
 msgstr ""
 
-#: ui/app.slint:124
+#: ui/app.slint:106
+msgctxt "Row"
+msgid "“{}” · {}"
+msgstr ""
+
+#: ui/app.slint:137
 msgctxt "Row"
 msgid "Waiting"
 msgstr ""
 
-#: ui/app.slint:125
+#: ui/app.slint:138
 msgctxt "Row"
 msgid "Converting…"
 msgstr ""
 
-#: ui/app.slint:126
+#: ui/app.slint:139
 msgctxt "Row"
 msgid "Converted"
 msgstr ""
 
-#: ui/app.slint:126
+#: ui/app.slint:139
 msgctxt "Row"
 msgid "Checked"
 msgstr ""
 
-#: ui/app.slint:127
+#: ui/app.slint:140
 msgctxt "Row"
 msgid "Skipped"
 msgstr ""
 
-#: ui/app.slint:128
+#: ui/app.slint:141
 msgctxt "Row"
 msgid "Ready"
 msgstr ""
 
-#: ui/app.slint:128
+#: ui/app.slint:141
 msgctxt "Row"
 msgid "Failed"
 msgstr ""
 
-#: ui/app.slint:199
+#: ui/app.slint:213
 msgctxt "AppWindow"
 msgid "{n} file"
 msgid_plural "{n} files"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/app.slint:200
+#: ui/app.slint:214
 msgctxt "AppWindow"
 msgid "{} converted, {} skipped, {} failed"
 msgstr ""
 
-#: ui/app.slint:201
+#: ui/app.slint:216
 msgctxt "AppWindow"
 msgid "Nothing to add there: no STL or .bread files."
 msgstr ""
 
-#: ui/app.slint:202
+#: ui/app.slint:217
 msgctxt "AppWindow"
 msgid "Choose the folder to write into."
 msgstr ""
 
-#: ui/app.slint:203
+#: ui/app.slint:218
 msgctxt "AppWindow"
 msgid "Converting {} of {}: {} of {}, {}"
 msgstr ""
 
-#: ui/app.slint:204
+#: ui/app.slint:219
 msgctxt "AppWindow"
 msgid "Done in {}: {}"
 msgstr ""
 
-#: ui/app.slint:205
+#: ui/app.slint:220
 msgctxt "AppWindow"
 msgid "Stopped after {}: {}"
 msgstr ""
 
-#: ui/app.slint:206
+#: ui/app.slint:221
 msgctxt "AppWindow"
 msgid "Converted in {}, nothing written: {} would take {}, {} more."
 msgstr ""
 
-#: ui/app.slint:207
+#: ui/app.slint:222
 msgctxt "AppWindow"
 msgid "Converted in {}, nothing written: {} would take {}, {} less."
 msgstr ""
 
-#: ui/app.slint:208
+#: ui/app.slint:223
 msgctxt "AppWindow"
 msgid "Add STL or .bread files to convert."
 msgstr ""
 
-#: ui/app.slint:209
+#: ui/app.slint:224
 msgctxt "AppWindow"
 msgid "{}, {}"
 msgstr ""
 
-#: ui/app.slint:279 ui/app.slint:819
+#: ui/app.slint:308 ui/app.slint:977
 msgctxt "AppWindow"
 msgid "STL and .bread, both ways, without losing a bit"
 msgstr ""
 
-#: ui/app.slint:302
+#: ui/app.slint:331
 msgctxt "AppWindow"
 msgid "About"
 msgstr ""
 
-#: ui/app.slint:310
+#: ui/app.slint:339
 msgctxt "AppWindow"
 msgid "Minimize"
 msgstr ""
 
-#: ui/app.slint:317
+#: ui/app.slint:346
 msgctxt "AppWindow"
 msgid "Restore"
 msgstr ""
 
-#: ui/app.slint:317
+#: ui/app.slint:346
 msgctxt "AppWindow"
 msgid "Maximize"
 msgstr ""
 
-#: ui/app.slint:324 ui/app.slint:820
+#: ui/app.slint:353 ui/app.slint:902 ui/app.slint:978
 msgctxt "AppWindow"
 msgid "Close"
 msgstr ""
 
-#: ui/app.slint:360
+#: ui/app.slint:389
 msgctxt "AppWindow"
 msgid "ADD"
 msgstr ""
 
-#: ui/app.slint:366
+#: ui/app.slint:395
 msgctxt "AppWindow"
 msgid "Files…"
 msgstr ""
 
-#: ui/app.slint:375
+#: ui/app.slint:404
 msgctxt "AppWindow"
 msgid "Folder…"
 msgstr ""
 
-#: ui/app.slint:384
+#: ui/app.slint:413
 msgctxt "AppWindow"
 msgid "Look inside subfolders"
 msgstr ""
 
-#: ui/app.slint:391
+#: ui/app.slint:420
 msgctxt "AppWindow"
 msgid "Or drop files and folders on the list."
 msgstr ""
 
-#: ui/app.slint:396
+#: ui/app.slint:425
 msgctxt "AppWindow"
 msgid "CONVERT"
 msgstr ""
 
-#: ui/app.slint:399
+#: ui/app.slint:428
 msgctxt "AppWindow"
 msgid "Both ways"
 msgstr ""
 
-#: ui/app.slint:399
+#: ui/app.slint:428
 msgctxt "AppWindow"
 msgid "STL → .bread"
 msgstr ""
 
-#: ui/app.slint:399
+#: ui/app.slint:428
 msgctxt "AppWindow"
 msgid ".bread → STL"
 msgstr ""
 
-#: ui/app.slint:409
+#: ui/app.slint:438
 msgctxt "AppWindow"
 msgid "Each file by its extension: STL to .bread, .bread to STL."
 msgstr ""
 
-#: ui/app.slint:411
+#: ui/app.slint:440
 msgctxt "AppWindow"
 msgid ""
 "STL files only, binary or ASCII. Each .bread file is read back and checked "
 "bit for bit before it is written."
 msgstr ""
 
-#: ui/app.slint:412
+#: ui/app.slint:441
 msgctxt "AppWindow"
 msgid ""
 ".bread files only. Everything each file shows goes into one STL, in place."
 msgstr ""
 
-#: ui/app.slint:417
+#: ui/app.slint:446
+msgctxt "AppWindow"
+msgid "CREDIT"
+msgstr ""
+
+#: ui/app.slint:450
+msgctxt "AppWindow"
+msgid "Designer"
+msgstr ""
+
+#: ui/app.slint:458
+msgctxt "AppWindow"
+msgid "License, such as CC-BY-4.0"
+msgstr ""
+
+#: ui/app.slint:480
+msgctxt "AppWindow"
+msgid "Where they come from: https://…"
+msgstr ""
+
+#: ui/app.slint:490
+msgctxt "AppWindow"
+msgid ""
+"Written into every .bread file, with the file's name as its title: click a "
+"file to change it. What is left empty is not written."
+msgstr ""
+
+#: ui/app.slint:495
 msgctxt "AppWindow"
 msgid "EXPORT"
 msgstr ""
 
-#: ui/app.slint:420
+#: ui/app.slint:498
 msgctxt "AppWindow"
 msgid "Convert and export"
 msgstr ""
 
-#: ui/app.slint:420
+#: ui/app.slint:498
 msgctxt "AppWindow"
 msgid "Convert only"
 msgstr ""
 
-#: ui/app.slint:430
+#: ui/app.slint:508
 msgctxt "AppWindow"
 msgid "Each file is written as soon as it is converted."
 msgstr ""
 
-#: ui/app.slint:431
+#: ui/app.slint:509
 msgctxt "AppWindow"
 msgid ""
 "Nothing is written yet: see how much room they would take, then export them "
 "as set below."
 msgstr ""
 
-#: ui/app.slint:436
+#: ui/app.slint:514
 msgctxt "AppWindow"
 msgid "WRITE"
 msgstr ""
 
-#: ui/app.slint:439
+#: ui/app.slint:517
 msgctxt "AppWindow"
 msgid "Next to each file"
 msgstr ""
 
-#: ui/app.slint:439
+#: ui/app.slint:517
 msgctxt "AppWindow"
 msgid "Into a folder"
 msgstr ""
 
-#: ui/app.slint:451
+#: ui/app.slint:529
 msgctxt "AppWindow"
 msgid "Choose a folder"
 msgstr ""
 
-#: ui/app.slint:468
+#: ui/app.slint:546
 msgctxt "AppWindow"
 msgid "Keep the subfolders"
 msgstr ""
 
-#: ui/app.slint:477
+#: ui/app.slint:555
 msgctxt "AppWindow"
 msgid "IF THE FILE IS THERE"
 msgstr ""
 
-#: ui/app.slint:480
+#: ui/app.slint:558
 msgctxt "AppWindow"
 msgid "Skip"
 msgstr ""
 
-#: ui/app.slint:480
+#: ui/app.slint:558
 msgctxt "AppWindow"
 msgid "Replace"
 msgstr ""
 
-#: ui/app.slint:480
+#: ui/app.slint:558
 msgctxt "AppWindow"
 msgid "Keep both"
 msgstr ""
 
-#: ui/app.slint:519
+#: ui/app.slint:596
 msgctxt "AppWindow"
 msgid "FILE"
 msgstr ""
 
-#: ui/app.slint:524
+#: ui/app.slint:601
 msgctxt "AppWindow"
 msgid "WAY"
 msgstr ""
 
-#: ui/app.slint:528
+#: ui/app.slint:605
 msgctxt "AppWindow"
 msgid "SIZE"
 msgstr ""
 
-#: ui/app.slint:533
+#: ui/app.slint:610
 msgctxt "AppWindow"
 msgid "RESULT"
 msgstr ""
 
-#: ui/app.slint:543
+#: ui/app.slint:620
 msgctxt "AppWindow"
 msgid "STATE"
 msgstr ""
 
-#: ui/app.slint:564
+#: ui/app.slint:641
 msgctxt "AppWindow"
 msgid "Drop STL and .bread files or folders here"
 msgstr ""
 
-#: ui/app.slint:570
+#: ui/app.slint:647
 msgctxt "AppWindow"
 msgid "or add them with Files… and Folder…"
 msgstr ""
 
-#: ui/app.slint:602
+#: ui/app.slint:683
 msgctxt "AppWindow"
 msgid "converted"
 msgstr ""
 
-#: ui/app.slint:606
+#: ui/app.slint:687
 msgctxt "AppWindow"
 msgid "time"
 msgstr ""
 
-#: ui/app.slint:610
+#: ui/app.slint:691
 msgctxt "AppWindow"
 msgid "before"
 msgstr ""
 
-#: ui/app.slint:614
+#: ui/app.slint:695
 msgctxt "AppWindow"
 msgid "would take"
 msgstr ""
 
-#: ui/app.slint:614
+#: ui/app.slint:695
 msgctxt "AppWindow"
 msgid "after"
 msgstr ""
 
-#: ui/app.slint:618
+#: ui/app.slint:699
 msgctxt "AppWindow"
 msgid "more"
 msgstr ""
 
-#: ui/app.slint:618
+#: ui/app.slint:699
 msgctxt "AppWindow"
 msgid "saved"
 msgstr ""
 
-#: ui/app.slint:622
+#: ui/app.slint:703
 msgctxt "AppWindow"
 msgid "free where it would go"
 msgstr ""
 
-#: ui/app.slint:626
+#: ui/app.slint:707
 msgctxt "AppWindow"
 msgid ""
 "There is not enough room there for them: export them somewhere else, or skip "
 "some."
 msgstr ""
 
-#: ui/app.slint:651
+#: ui/app.slint:732
 msgctxt "AppWindow"
 msgid "Drop to add"
 msgstr ""
 
-#: ui/app.slint:697
+#: ui/app.slint:778
 msgctxt "AppWindow"
 msgid "Open folder"
 msgstr ""
 
-#: ui/app.slint:709
+#: ui/app.slint:791
 msgctxt "AppWindow"
 msgid "Clear"
 msgstr ""
 
-#: ui/app.slint:721
+#: ui/app.slint:804
 msgctxt "AppWindow"
 msgid "Stop"
 msgstr ""
 
-#: ui/app.slint:733
+#: ui/app.slint:816
 msgctxt "AppWindow"
 msgid "Export"
 msgstr ""
 
-#: ui/app.slint:747
+#: ui/app.slint:830
 msgctxt "AppWindow"
 msgid "Convert"
 msgstr ""
 
-#: ui/app.slint:827
+#: ui/app.slint:900
+msgctxt "AppWindow"
+msgid "Title"
+msgstr ""
+
+#: ui/app.slint:919
+msgctxt "AppWindow"
+msgid "The title written into this file's .bread. Left empty, it has none."
+msgstr ""
+
+#: ui/app.slint:924
+msgctxt "AppWindow"
+msgid "From the file's name"
+msgstr ""
+
+#: ui/app.slint:935
+msgctxt "AppWindow"
+msgid "OK"
+msgstr ""
+
+#: ui/app.slint:985
 msgctxt "AppWindow"
 msgid ""
 "Part of bread-format, the open .bread format: tiny, lossless meshes and "

@@ -7,6 +7,7 @@ on the reference implementation in [`crates/bread-format`](../bread-format).
 bread model.stl                         # model.bread, next to it
 bread model.bread                       # model.stl, next to it
 bread from-stl a.stl b.stl -o kit.bread --name "A kit"
+bread from-stl dragon.stl --title "Dragon" --designer "A. Designer" --license CC-BY-4.0 --source https://example.com/dragon
 bread to-stl kit.bread -o kit.stl
 bread info kit.bread
 bread check kit.bread other.bread
@@ -21,6 +22,13 @@ that is already there unless told to with `--force`.
   the STL put it. Before the file is written, it is read back and checked: every mesh as read from
   its STL, and every corner of a binary STL as the STL's own bytes, bit for bit. A file that fails
   the check is not written.
+- **Credit:** `from-stl` writes `--title`, `--designer`, `--license` (an SPDX expression, such as
+  `CC-BY-4.0`) and `--source` (a URL) into the file as its metadata (`SPEC.md` 12), so who made a
+  model and how it may be used travels with every copy. Every `.bread` file `bread` writes also
+  says that `bread` wrote it (`generator`) and when (`created`); with `SOURCE_DATE_EPOCH` set to a
+  time in seconds, that time instead, so a conversion can be made again byte for byte. A value
+  that cannot be written, such as a title with a line break or a source that is not a URL, is
+  said before anything is converted.
 - **`to-stl`** makes everything a `.bread` file shows into one binary STL, as the viewer's
   "Download as STL": each part in its world position, each vertex moved by its transform in f64
   and rounded to f32 (SPEC 5.4). Parts with no transform keep their vertices bit for bit. Support
@@ -40,7 +48,8 @@ cargo test -p bread-cli
 
 The tests run the program on every file in [`conformance/`](../../conformance): `check` reads
 every valid file and refuses every invalid one, and every valid file goes to STL, back to
-`.bread` and to STL again with the same corners, bit for bit.
+`.bread` and to STL again with the same corners, bit for bit. The credit is read back from the
+file written, entry by entry.
 
 ## License
 

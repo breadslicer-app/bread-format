@@ -12,7 +12,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use bread_cli::{Error, StlFile, check, from_stl, grouped, info, to_stl};
+use bread_cli::{Credit, Error, StlFile, check, from_stl_with, grouped, info, now, to_stl};
 use bread_format::read_file;
 
 const HELP: &str = "\
@@ -21,7 +21,7 @@ bread: converts STL to .bread and back, and looks inside .bread files.
 Usage:
   bread <file>...                     each .stl to .bread and each .bread to .stl,
                                       next to it (or drop files on bread)
-  bread from-stl <file.stl>... [-o <out.bread>] [--name <name>]
+  bread from-stl <file.stl>... [-o <out.bread>] [--name <name>] [credit]
                                       STL files as one .bread file, a part each
   bread to-stl <file.bread> [-o <out.stl>]
                                       everything a .bread file shows, as one STL
@@ -35,8 +35,16 @@ Options:
   -h, --help            this help
   -V, --version         the version
 
+Credit, written into the .bread file as its metadata (from-stl):
+  --title <title>       the model's title
+  --designer <name>     who designed it
+  --license <license>   its license, as an SPDX expression such as CC-BY-4.0
+  --source <url>        where it comes from, such as https://example.com/model
+
 Every conversion to .bread is read back and checked before it is written:
 each mesh as read from its STL, and each corner of a binary STL, bit for bit.
+Every .bread file written also says that bread wrote it, and when: set
+SOURCE_DATE_EPOCH to a time in seconds to make a conversion again byte for byte.
 ";
 
 /// What went wrong: the arguments, or the work.
@@ -57,6 +65,7 @@ struct Args {
     files: Vec<PathBuf>,
     output: Option<PathBuf>,
     name: Option<String>,
+    credit: Credit,
     force: bool,
 }
 
@@ -80,11 +89,18 @@ fn parse(raw: Vec<OsString>) -> Result<Args, Failure> {
                     continue;
                 }
                 Some("--name") => {
-                    let name = raw.next().ok_or_else(|| usage("--name needs a name"))?;
-                    let name = name
-                        .into_string()
-                        .map_err(|_| usage("the name is not valid Unicode"))?;
-                    args.name = Some(name);
+                    args.name = Some(text_of(raw.next(), "--name", "a name")?);
+                    continue;
+                }
+                Some(flag @ ("--title" | "--designer" | "--license" | "--source")) => {
+                    let value = text_of(raw.next(), flag, "a value")?;
+                    let field = match flag {
+                        "--title" => &mut args.credit.title,
+                        "--designer" => &mut args.credit.designer,
+                        "--license" => &mut args.credit.license,
+                        _ => &mut args.credit.source,
+                    };
+                    *field = Some(value);
                     continue;
                 }
                 Some("-f" | "--force") => {
@@ -107,6 +123,14 @@ fn parse(raw: Vec<OsString>) -> Result<Args, Failure> {
         args.files.push(arg.into());
     }
     Ok(args)
+}
+
+/// The text an option is given, which must be there and be Unicode.
+fn text_of(value: Option<OsString>, flag: &str, what: &str) -> Result<String, Failure> {
+    value
+        .ok_or_else(|| usage(&format!("{flag} needs {what}")))?
+        .into_string()
+        .map_err(|_| usage(&format!("what {flag} is given is not valid Unicode")))
 }
 
 fn usage(message: &str) -> Failure {
@@ -146,12 +170,20 @@ fn run(args: &Args) -> Result<bool, Failure> {
     if args.name.is_some() && args.command.as_deref() != Some("from-stl") {
         return Err(usage("--name is for from-stl"));
     }
+    if args.credit != Credit::default() && args.command.as_deref() != Some("from-stl") {
+        return Err(usage(
+            "--title, --designer, --license and --source are for from-stl",
+        ));
+    }
+    let credit = args.credit.clone().tidy();
+    credit.check().map_err(|e| usage(&e.0))?;
     match args.command.as_deref() {
         Some("from-stl") => {
             stl_to_bread(
                 &args.files,
                 args.output.as_deref(),
                 args.name.as_deref(),
+                &credit,
                 args.force,
             )?;
             Ok(true)
@@ -193,6 +225,7 @@ fn run(args: &Args) -> Result<bool, Failure> {
                     &[path.to_path_buf()],
                     args.output.as_deref(),
                     None,
+                    &credit,
                     args.force,
                 ),
                 Some("bread") => bread_to_stl(path, args.output.as_deref(), args.force),
@@ -255,6 +288,7 @@ fn stl_to_bread(
     files: &[PathBuf],
     output: Option<&Path>,
     name: Option<&str>,
+    credit: &Credit,
     force: bool,
 ) -> Result<(), Error> {
     let stls = files
@@ -268,7 +302,9 @@ fn stl_to_bread(
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
-    let (bytes, parts) = from_stl(&stls, name)?;
+    let generator = format!("bread {}", env!("CARGO_PKG_VERSION"));
+    let metadata = credit.metadata(&now(), &generator);
+    let (bytes, parts) = from_stl_with(&stls, name, metadata)?;
     let out = output.map_or_else(|| next_to(&files[0], "bread"), Path::to_path_buf);
     write(&out, &bytes, force)?;
     let stl_bytes: usize = stls.iter().map(|f| f.bytes.len()).sum();

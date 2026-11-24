@@ -17,6 +17,12 @@ checked exactly as `bread from-stl` and `bread to-stl` do it.
   converting the rest again. It can be pressed again to write them somewhere else.
 - **Write** next to each file, or into a folder, keeping the subfolders the files were found in
   or not.
+- **Credit** each `.bread` file: a designer, a license (an SPDX expression, with the common ones
+  a click away; any text is kept) and where the models come from, given once for the whole batch
+  and remembered, are written into every `.bread` file as its metadata (`SPEC.md` 12), with the
+  program and the time it was made. Each file's title is its name, and a click on a file changes
+  it. A credit that cannot be written, such as a source that is not a URL, is said before
+  anything is converted. What is left empty is not written.
 - **If the file is there:** skip it, replace it, or keep both (`name (2).bread`). Two files never
   write the same file, and no file is written over another file of the list.
 - Up to four files are converted side by side. The list shows each file's size before and after,
@@ -40,7 +46,7 @@ On Linux the window links fontconfig: building needs its development files
 
 The tests cover the queue without the window: which files folders give, where each goes, what
 happens when a file is there, the conversions both ways, converting in memory and writing
-later, and the free room.
+later, the credit each `.bread` file carries, and the free room.
 
 The window is `ui/app.slint`, on `ui/kit/`: Breadslicer's design tokens (`theme.slint`), controls,
 dialog pieces and icons, as Breadslicer has them. The Spanish texts are in `tools/translate_es.py`;
