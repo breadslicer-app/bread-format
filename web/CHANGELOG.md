@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 2026-11-23, the Python reader from Python 3.10
+
+- `second_reader_dependencies` stays 0, now counted on Python 3.14 or later: the reader runs on
+  Python 3.10 and later, and before 3.14 it also needs the `zstandard` package, which pip installs
+  with it. `notes/second-reader.md` says so. It is still not on PyPI (#162).
+
 ## 2026-11-21, the crate's version on crates.io
 
 - New fact, `[project] crate_version`: 0.4.0, the newest release of the crate on crates.io, for

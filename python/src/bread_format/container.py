@@ -7,19 +7,15 @@ from __future__ import annotations
 
 import struct
 import zlib
-from compression import zstd
 from dataclasses import dataclass
 
+from ._zstd import Failed, inflate
 from .errors import BreadError
 
 MAGIC = b"BREAD\x00\r\n"
 CONTAINER_VERSION = 1
 
 _CHUNK_HEADER = struct.Struct("<4sHQQI")  # tag, version, raw, stored, CRC: 26 bytes
-
-# How much is decompressed at a time: memory grows with what a payload really
-# holds, never with the raw length it claims (SPEC 4.5).
-_STEP = 1 << 20
 
 # The first four bytes of a Zstandard frame that holds data (RFC 8878, 3.1.1).
 _ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
@@ -79,18 +75,10 @@ def decompress(chunk: RawChunk) -> bytes:
     if bytes(chunk.stored[:4]) != _ZSTD_MAGIC:
         # A skippable frame is a valid frame that holds no payload.
         raise BreadError("bad-payload", chunk.name)
-    decompressor = zstd.ZstdDecompressor()
-    out = bytearray()
-    data = bytes(chunk.stored)
     try:
-        while True:
-            want = min(chunk.raw_length + 1 - len(out), _STEP)
-            out += decompressor.decompress(data, max_length=want)
-            data = b""
-            if len(out) > chunk.raw_length or decompressor.eof or decompressor.needs_input:
-                break
-    except zstd.ZstdError:
+        out, whole = inflate(bytes(chunk.stored), chunk.raw_length)
+    except Failed:
         raise BreadError("bad-payload", chunk.name) from None
-    if len(out) != chunk.raw_length or not decompressor.eof or decompressor.unused_data:
+    if len(out) != chunk.raw_length or not whole:
         raise BreadError("bad-payload", chunk.name)
-    return bytes(out)
+    return out
