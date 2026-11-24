@@ -144,10 +144,11 @@ export function busy(text) {
 /** The colour of each placement, and whether it shows: hooks may change them. */
 export function items() {
 	const file = state.file;
+	// Supports and rafts, by their role, in the supports' colour.
 	return file.placements.map((p, i) => ({
 		mesh: p.mesh,
 		matrix: p.matrix,
-		color: COLORS.model,
+		color: (file.kinds?.[i] ?? 'model') === 'model' ? COLORS.model : COLORS.support,
 		visible: true,
 		placement: i,
 	}));
