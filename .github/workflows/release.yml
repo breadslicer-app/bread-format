@@ -1,0 +1,136 @@
+# The programs, built for download: `bread` for Windows, Linux and macOS, and
+# Bread Converter and the Explorer thumbnails for Windows, each in an archive
+# with its license notices and a SHA-256 checksum.
+#
+# A tag `tools-v<version>` builds them and attaches them to a draft release,
+# which is published by hand. A pull request that changes this workflow or
+# tools/release, or a manual run, only builds them and keeps the archives as
+# the run's artifacts. How to make a release: tools/release/README.md.
+name: Release
+on:
+  push:
+    tags: ["tools-v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - tools/release/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-latest
+            packages: -p bread-cli -p bread-converter -p bread-thumbnails
+            # The C runtime linked in, so that nothing needs a Visual C++
+            # redistributable.
+            rustflags: -C target-feature=+crt-static
+          # The oldest supported Ubuntu, for the oldest C library the
+          # program can run on.
+          - platform: linux-x64
+            os: ubuntu-22.04
+            packages: -p bread-cli
+            rustflags: ""
+          - platform: macos-arm64
+            os: macos-latest
+            packages: -p bread-cli
+            rustflags: ""
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install stable --profile minimal
+      # The building machine's paths are kept out of the programs: the
+      # checkout, the cargo home with the crates' sources, the toolchain and
+      # the home folder each become a short fixed name.
+      - name: Build
+        run: |
+          cargo_home=${CARGO_HOME:-$HOME/.cargo}
+          rustup_home=${RUSTUP_HOME:-$HOME/.rustup}
+          workspace=$GITHUB_WORKSPACE
+          if [ "$RUNNER_OS" = Windows ]; then
+            cargo_home=$(cygpath -w "$cargo_home")
+            rustup_home=$(cygpath -w "$rustup_home")
+            workspace=$(cygpath -w "$workspace")
+            home=$(cygpath -w "$HOME")
+          else
+            home=$HOME
+          fi
+          # The last mapping that matches wins, so the home folder, which
+          # holds the others, comes first.
+          export RUSTFLAGS="${{ matrix.rustflags }} --remap-path-prefix=$home=home --remap-path-prefix=$cargo_home=cargo --remap-path-prefix=$rustup_home=rustup --remap-path-prefix=$workspace=bread-format"
+          cargo +stable build --release --locked ${{ matrix.packages }}
+          # What must not be in them: the paths as Windows and as Unix write
+          # them, and on Windows the user's name (elsewhere it is a common
+          # word, and the home path covers it).
+          {
+            echo "CHECK_WORKSPACE=$workspace"
+            echo "CHECK_HOME=$home"
+            if [ "$RUNNER_OS" = Windows ]; then
+              echo "CHECK_WORKSPACE_M=$(cygpath -m "$GITHUB_WORKSPACE")"
+              echo "CHECK_HOME_M=$(cygpath -m "$HOME")"
+              echo "CHECK_USER=$(basename "$HOME")"
+            fi
+          } >>"$GITHUB_ENV"
+      - name: No local paths in the programs
+        run: |
+          for f in target/release/bread target/release/bread.exe target/release/bread-converter.exe target/release/bread_thumbnails.dll; do
+            [ -f "$f" ] || continue
+            tools/release/check-paths.sh "$f" "$CHECK_WORKSPACE" "$CHECK_HOME" \
+              "${CHECK_WORKSPACE_M:-}" "${CHECK_HOME_M:-}" "${CHECK_USER:-}"
+          done
+      - run: tools/release/package.sh ${{ matrix.platform }} target/release dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/tools-v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          cat *.sha256 >SHA256SUMS.txt
+          rm *.sha256
+          cat >notes.md <<'NOTES'
+          The programs, built. Each archive holds the program, a README, the license and the
+          notices of the libraries built in. `SHA256SUMS.txt` has every archive's checksum.
+
+          - `bread-*`: the command-line program, for Windows, Linux and macOS.
+          - `Bread-Converter-*`: the desktop converter, for Windows. Nothing to install.
+          - `bread-thumbnails-*`: thumbnails of `.bread` files in Windows Explorer;
+            `register.cmd` turns them on for the current user.
+
+          The programs are not signed: Windows and macOS may warn the first time. The READMEs
+          say what to do.
+          NOTES
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "Programs ${TAG#tools-v}" --notes-file notes.md \
+            ./*.zip ./*.tar.gz SHA256SUMS.txt
