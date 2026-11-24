@@ -5,7 +5,8 @@
 
 //! The C ABI for writing, built with the `write` feature: reading an STL into
 //! the mesh the mesh accessors of [`crate::abi`] give, and writing a file
-//! from meshes JavaScript adds one by one and a scene that places them.
+//! from meshes JavaScript adds one by one, a scene that places them, and
+//! metadata.
 //! Writing takes zstd's compressor and meshoptimizer's encoders, which more
 //! than double the module, so a page that only reads loads the module built
 //! without it.
@@ -18,11 +19,13 @@ use bread_format::{MESH_TAG, Mesh, Meta};
 
 use crate::Refusal;
 use crate::abi::{MESH, REFUSAL};
-use crate::{read_stl_mesh, write_bread};
+use crate::{read_stl_mesh, write_bread_with_metadata};
 
 thread_local! {
     /// The meshes of the file being written, in order.
     static WRITING: RefCell<Vec<Mesh>> = const { RefCell::new(Vec::new()) };
+    /// The metadata chunk payload of the file being written, if it has one.
+    static METADATA: RefCell<Option<Vec<u8>>> = const { RefCell::new(None) };
     /// The last file written.
     static OUTPUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
@@ -30,6 +33,7 @@ thread_local! {
 /// Drops the file being written and the last one written.
 pub(crate) fn release() {
     WRITING.set(Vec::new());
+    METADATA.set(None);
     OUTPUT.set(Vec::new());
 }
 
@@ -39,7 +43,7 @@ pub(crate) fn release() {
 ///
 /// # Safety
 ///
-/// As for [`bread_read_chunks`].
+/// As for [`bread_read_chunks`](crate::abi::bread_read_chunks).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bread_read_stl(ptr: *const u8, len: usize) -> u32 {
     // SAFETY: the caller promises `len` readable bytes at `ptr`.
@@ -53,10 +57,25 @@ pub unsafe extern "C" fn bread_read_stl(ptr: *const u8, len: usize) -> u32 {
     u32::from(refusal.is_none())
 }
 
-/// Starts a file to write: drops the meshes added so far.
+/// Starts a file to write: drops the meshes and the metadata added so far.
 #[unsafe(no_mangle)]
 pub extern "C" fn bread_write_begin() {
     WRITING.set(Vec::new());
+    METADATA.set(None);
+}
+
+/// Gives the file being written the metadata chunk payload in the `len`
+/// bytes at `ptr` (`SPEC.md`, section 12), in place of any given before. It
+/// is checked when the file is written, against its scene.
+///
+/// # Safety
+///
+/// As for [`bread_read_chunks`](crate::abi::bread_read_chunks).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bread_write_metadata(ptr: *const u8, len: usize) {
+    // SAFETY: the caller promises `len` readable bytes at `ptr`.
+    let payload = unsafe { std::slice::from_raw_parts(ptr, len) };
+    METADATA.set(Some(payload.to_vec()));
 }
 
 /// The text of `len` bytes at `ptr`, or `None` for a null `ptr`; `Err` when
@@ -186,19 +205,22 @@ unsafe fn mesh_from(
 }
 
 /// Writes the file of the meshes added since [`bread_write_begin`], placed
-/// by the scene chunk payload in the `len` bytes at `ptr`, as [`write_bread`]
-/// does. Returns 1 when it was written, and the output accessors give it, and
-/// 0 when it was refused. Either way the meshes added are dropped.
+/// by the scene chunk payload in the `len` bytes at `ptr`, with the metadata
+/// of [`bread_write_metadata`] if it was given, as
+/// [`write_bread_with_metadata`] does. Returns 1 when it was written, and the
+/// output accessors give it, and 0 when it was refused. Either way the meshes
+/// and the metadata added are dropped.
 ///
 /// # Safety
 ///
-/// As for [`bread_read_chunks`].
+/// As for [`bread_read_chunks`](crate::abi::bread_read_chunks).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn bread_write_file(ptr: *const u8, len: usize) -> u32 {
     // SAFETY: the caller promises `len` readable bytes at `ptr`.
     let payload = unsafe { std::slice::from_raw_parts(ptr, len) };
     let meshes = WRITING.take();
-    let (output, refusal) = match write_bread(meshes, payload) {
+    let metadata = METADATA.take();
+    let (output, refusal) = match write_bread_with_metadata(meshes, payload, metadata.as_deref()) {
         Ok(bytes) => (bytes, None),
         Err(refusal) => (Vec::new(), Some(refusal)),
     };
